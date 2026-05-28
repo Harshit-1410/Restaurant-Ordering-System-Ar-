@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Menu - Food Delivery</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <button class="menu-btn">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Search Section -->
+        <div class="search-section">
+            <div class="search-container">
+                <input type="text" placeholder="Search your favorite food" class="search-input">
+                <button class="search-btn">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Menu Items -->
+        <div class="menu-section">
+            <div class="menu-item" 
+                 data-usdz="AR-Code-1667811683120.usdz" 
+                 data-glb="AR-Code-1667811683120.glb">
+                <div class="item-image">
+                    <img src="https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=300&h=200&fit=crop" alt="Burger" class="food-image">
+                </div>
+                <div class="item-content">
+                    <div class="item-top">
+                        <div class="item-header">
+                            <h3>Burger</h3>
+                        </div>
+                        <p class="description">Juicy beef patty with fresh lettuce, tomatoes, and our special sauce on a toasted bun. A classic favorite that never disappoints.</p>
+                    </div>
+                    <div class="item-footer">
+                        <span class="price">$ 7.99</span>
+                        <div class="buttons">
+                            <button class="ar-btn" type="button">
+                                <i class="fas fa-cube"></i>
+                                View in AR
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Hidden AR preview container -->
+                    <div class="inline-ar-preview" style="display: none; margin-top: 10px;"></div>
+                </div>
+            </div>
+
+
+            <div class="menu-item">
+                <div class="item-image">
+                    <img src="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=300&h=200&fit=crop" alt="Spicy Ramen" class="food-image">
+                </div>
+                <div class="item-content">
+                    <div class="item-top">
+                        <div class="item-header">
+                            <h3>Spicy Ramen</h3>
+                        </div>
+                        <p class="description">A rich, flavorful broth combined with tender noodles and spices for a warming, satisfying meal that delivers authentic Japanese comfort.</p>
+                    </div>
+                    <div class="item-footer">
+                        <span class="price">$ 8.99</span>
+                        <div class="buttons">
+                            <button class="ar-btn">
+                                <i class="fas fa-cube"></i>
+                                View in AR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="menu-item">
+                <div class="item-image">
+                    <img src="https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300&h=200&fit=crop" alt="Japanese Fried Chicken" class="food-image">
+                </div>
+                <div class="item-content">
+                    <div class="item-top">
+                        <div class="item-header">
+                            <h3>Japanese Fried Chicken</h3>
+                        </div>
+                        <p class="description">Crispy fried chicken with a perfectly seasoned coating that delivers a satisfying crunch with every bite, served hot and fresh.</p>
+                    </div>
+                    <div class="item-footer">
+                        <span class="price">$ 5.99</span>
+                        <div class="buttons">
+                            <button class="ar-btn">
+                                <i class="fas fa-cube"></i>
+                                View in AR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="see-more">
+                <a href="#" class="see-more-link">See More</a>
+            </div>
+        </div>
+
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
