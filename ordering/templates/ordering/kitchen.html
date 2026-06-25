@@ -1,16 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Kitchen — {{ restaurant.name }}</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -19,567 +14,465 @@
             min-height: 100vh;
         }
 
+        /* ── Header ── */
         .header {
             background: #1a1a1a;
-            padding: 16px 24px;
+            padding: 14px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid #2a2a2a;
             position: sticky;
             top: 0;
             z-index: 100;
         }
+        .header h1  { font-size: 17px; font-weight: 700; }
+        .header-right { display: flex; align-items: center; gap: 14px; }
+        .ws-dot { width: 9px; height: 9px; border-radius: 50%; background: #e74c3c; }
+        .ws-dot.connected { background: #2ecc71; }
+        .ws-label { font-size: 12px; color: #888; }
 
-        .header h1 {
+        /* ── Layout ── */
+        .main { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+
+        .empty-state {
+            text-align: center;
+            color: #444;
+            padding: 80px 20px;
+            font-size: 15px;
+        }
+        .empty-state strong { display: block; font-size: 22px; margin-bottom: 8px; color: #555; }
+
+        /* ── Table section ── */
+        .table-section {
+            background: #161616;
+            border: 1px solid #272727;
+            border-radius: 14px;
+            margin-bottom: 18px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            background: #1e1e1e;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #272727;
+        }
+        .table-num {
             font-size: 18px;
-            font-weight: 700;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .ws-status {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #e74c3c;
-        }
-
-        .ws-status.connected {
-            background: #2ecc71;
-        }
-
-        .ws-label {
-            font-size: 12px;
-            color: #888;
-        }
-
-        .columns {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0;
-            min-height: calc(100vh - 57px);
-        }
-
-        .column {
-            border-right: 1px solid #222;
-            padding: 16px 12px;
-        }
-
-        .column:last-child {
-            border-right: none;
-        }
-
-        .column-title {
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            color: #888;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #222;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .column-count {
-            background: #333;
-            color: #fff;
-            border-radius: 10px;
-            padding: 2px 8px;
-            font-size: 11px;
-        }
-
-        .col-pending .column-title {
-            color: #f39c12;
-        }
-
-        .col-preparing .column-title {
-            color: #3498db;
-        }
-
-        .col-ready .column-title {
-            color: #2ecc71;
-        }
-
-        .col-served .column-title {
-            color: #888;
-        }
-
-        .order-card {
-            background: #1a1a1a;
-            border-radius: 10px;
-            padding: 14px;
-            margin-bottom: 10px;
-            border: 1px solid #2a2a2a;
-            transition: border-color 0.2s;
-        }
-
-        .order-card.new-flash {
-            animation: flash 0.6s ease 3;
-        }
-
-        @keyframes flash {
-
-            0%,
-            100% {
-                border-color: #2a2a2a;
-            }
-
-            50% {
-                border-color: #f39c12;
-            }
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .order-id {
-            font-size: 13px;
-            font-weight: 700;
+            font-weight: 800;
             color: #fff;
         }
-
-        .table-badge {
-            background: #333;
+        .guest-pill {
+            background: #2a2a2a;
             color: #aaa;
             font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 6px;
+            padding: 3px 9px;
+            border-radius: 20px;
+            font-weight: 600;
         }
-
-        .order-time {
+        .bill-badge {
+            margin-left: auto;
+            background: #f39c12;
+            color: #000;
             font-size: 11px;
-            color: #666;
-            margin-bottom: 8px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 6px;
+            animation: pulse-badge 1.5s ease infinite;
+        }
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.65; }
         }
 
-        .item-list {
-            margin-bottom: 12px;
+        /* ── Guest rows ── */
+        .guests-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 0;
         }
 
-        .item-row {
+        .guest-col {
+            border-right: 1px solid #222;
+            padding: 14px 16px;
+        }
+        .guest-col:last-child { border-right: none; }
+
+        .guest-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #555;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .guest-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #3498db;
+            flex-shrink: 0;
+        }
+
+        /* ── Order card ── */
+        .order-card {
+            background: #1f1f1f;
+            border: 1px solid #2d2d2d;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+        }
+        .order-card.flash-new {
+            animation: flash-new 0.5s ease 3;
+        }
+        @keyframes flash-new {
+            0%, 100% { border-color: #2d2d2d; }
+            50%       { border-color: #f39c12; }
+        }
+
+        .order-meta {
             display: flex;
             justify-content: space-between;
-            font-size: 13px;
-            padding: 4px 0;
-            border-bottom: 1px solid #222;
-            color: #ccc;
+            align-items: center;
+            margin-bottom: 8px;
         }
+        .order-id   { font-size: 13px; font-weight: 700; }
+        .order-total { font-size: 12px; color: #888; }
 
-        .item-row:last-child {
-            border: none;
+        .status-badge {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            margin-left: 6px;
         }
+        .status-pending   { background: #3b2b06; color: #f39c12; }
+        .status-preparing { background: #0a2a44; color: #3498db; }
+        .status-ready     { background: #0a2e16; color: #2ecc71; }
+        .status-served    { background: #222;    color: #666; }
+        .status-cancelled { background: #2b0a0a; color: #e74c3c; }
 
-        .item-qty {
-            color: #888;
-            margin-right: 6px;
+        .order-items {
+            margin-bottom: 10px;
         }
-
-        .card-actions {
+        .item-row {
             display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 4px;
+            font-size: 13px;
+            color: #ccc;
+            padding: 3px 0;
+            border-bottom: 1px solid #252525;
         }
+        .item-row:last-child { border: none; }
+        .item-qty { color: #888; font-variant-numeric: tabular-nums; min-width: 22px; }
+        .item-notes { font-size: 11px; color: #666; margin-top: 1px; }
 
-        .btn-status {
+        .order-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+        .btn-action {
             flex: 1;
-            padding: 8px 4px;
+            padding: 7px 4px;
             border-radius: 7px;
             border: none;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             cursor: pointer;
             transition: opacity 0.2s;
         }
+        .btn-action:hover { opacity: 0.85; }
+        .btn-prepare  { background: #3498db; color: #fff; }
+        .btn-ready    { background: #2ecc71; color: #000; }
+        .btn-served   { background: #555;    color: #fff; }
+        .btn-cancel   { background: #c0392b; color: #fff; }
 
-        .btn-status:hover {
-            opacity: 0.85;
-        }
-
-        .btn-preparing {
-            background: #3498db;
-            color: #fff;
-        }
-
-        .btn-ready {
-            background: #2ecc71;
-            color: #fff;
-        }
-
-        .btn-served {
-            background: #555;
-            color: #fff;
-        }
-
-        .btn-cancel {
-            background: #c0392b;
-            color: #fff;
-        }
-
-        .no-orders {
+        .no-orders-msg {
+            font-size: 12px;
             color: #444;
-            font-size: 13px;
+            padding: 10px 0;
             text-align: center;
-            padding: 24px 0;
         }
 
+        /* ── Toast ── */
         .toast {
             position: fixed;
-            top: 70px;
-            right: 20px;
+            top: 66px;
+            right: 18px;
             background: #2ecc71;
             color: #fff;
-            padding: 12px 20px;
+            padding: 11px 18px;
             border-radius: 8px;
             font-size: 13px;
             font-weight: 600;
             display: none;
             z-index: 999;
+            max-width: 320px;
         }
 
-        .bill-requests-panel {
-            padding: 16px 24px;
-            background: #151515;
-            border-bottom: 1px solid #222;
-        }
-        .bill-requests-title {
-            font-size: 13px; font-weight: 700; color: #f39c12; margin-bottom: 10px;
-            text-transform: uppercase; letter-spacing: 1px;
-        }
-        .bill-requests-list {
-            display: flex; gap: 12px; flex-wrap: wrap;
-        }
-        .bill-card {
-            background: #1a1a1a; border: 1px solid #f39c12; border-radius: 8px;
-            padding: 10px 14px; min-width: 140px;
-        }
-        .bill-card.new-flash {
-            animation: flash-bill 0.6s ease 3;
-        }
-        @keyframes flash-bill {
-            0%, 100% { background: #1a1a1a; }
-            50% { background: #5a3c0b; }
-        }
-        .bill-card-header { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
-        .bill-card-time { font-size: 11px; color: #888; }
-
-        @media (max-width: 768px) {
-            .columns {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .columns {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 640px) {
+            .main { padding: 12px; }
+            .guests-grid { grid-template-columns: 1fr; }
+            .guest-col { border-right: none; border-bottom: 1px solid #222; }
+            .guest-col:last-child { border-bottom: none; }
         }
     </style>
 </head>
-
 <body>
 
-    <div class="header">
-        <h1>{{ restaurant.name }} — Kitchen</h1>
-        <div class="header-right">
-            <a href="{% url 'ordering:billing' restaurant.id %}" style="color:#f39c12; text-decoration:none; font-size:13px; font-weight:700; margin-right:16px;">Go to Billing &rarr;</a>
-            <span class="ws-label" id="ws-label">Connecting...</span>
-            <div class="ws-status" id="ws-status"></div>
-        </div>
+<div class="header">
+    <h1>{{ restaurant.name }} — Kitchen</h1>
+    <div class="header-right">
+        <a href="{% url 'ordering:billing' restaurant.id %}"
+           style="color:#f39c12;text-decoration:none;font-size:13px;font-weight:700;">
+            Billing &rarr;
+        </a>
+        <span class="ws-label" id="ws-label">Connecting…</span>
+        <div class="ws-dot" id="ws-dot"></div>
     </div>
+</div>
 
-    <div class="toast" id="toast"></div>
+<div class="toast" id="toast"></div>
 
-    <div class="bill-requests-panel" id="bill-requests-panel" {% if not bill_requests %}style="display:none"{% endif %}>
-        <div class="bill-requests-title">🧾 Bill Requests</div>
-        <div class="bill-requests-list" id="bill-requests-list">
-            {% for session in bill_requests %}
-            <div class="bill-card" id="bill-session-{{ session.id }}">
-                <div class="bill-card-header">Table {{ session.table_number }}</div>
-                <div class="bill-card-time">{{ session.bill_requested_at|time:"H:i" }}</div>
+<div class="main">
+    {% if active_sessions %}
+        {% for session in active_sessions %}
+        {# Count only customers who have at least one non-cancelled order #}
+        {% with total_customers=session.customer_sessions.count %}
+        <div class="table-section" id="ts-{{ session.id }}">
+
+            <div class="table-header">
+                <span class="table-num">Table {{ session.table_number }}</span>
+                <span class="guest-pill">{{ total_customers }} guest{{ total_customers|pluralize }}</span>
+                {% if session.bill_requested_at %}
+                <span class="bill-badge">🧾 Bill Requested</span>
+                {% endif %}
             </div>
-            {% endfor %}
+
+            <div class="guests-grid">
+                {% for cs in session.customer_sessions.all %}
+                <div class="guest-col" id="guest-{{ cs.id }}">
+                    <div class="guest-label">
+                        <span class="guest-dot"></span>
+                        Guest {{ forloop.counter }} · {{ cs.created_at|time:"H:i" }}
+                    </div>
+
+                    {% for order in cs.orders.all %}
+                    {% if order.status != 'cancelled' %}
+                    <div class="order-card" id="order-{{ order.id }}">
+                        <div class="order-meta">
+                            <span class="order-id">
+                                #{{ order.id }}
+                                <span class="status-badge status-{{ order.status }}">{{ order.status }}</span>
+                            </span>
+                            <span class="order-total">₹{{ order.total_amount }}</span>
+                        </div>
+                        <div class="order-items">
+                            {% for item in order.items.all %}
+                            <div class="item-row">
+                                <span class="item-qty">{{ item.quantity }}×</span>
+                                <span>{{ item.menu_item.name }}</span>
+                            </div>
+                            {% if item.notes %}
+                            <div class="item-notes" style="padding-left:26px">{{ item.notes }}</div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="order-actions" id="actions-{{ order.id }}">
+                            {% if order.status == 'pending' %}
+                            <button class="btn-action btn-prepare" onclick="updateStatus({{ order.id }}, 'preparing')">Start Preparing</button>
+                            <button class="btn-action btn-cancel"  onclick="updateStatus({{ order.id }}, 'cancelled')">Cancel</button>
+                            {% elif order.status == 'preparing' %}
+                            <button class="btn-action btn-ready"  onclick="updateStatus({{ order.id }}, 'ready')">Mark Ready</button>
+                            {% elif order.status == 'ready' %}
+                            <button class="btn-action btn-served" onclick="updateStatus({{ order.id }}, 'served')">Mark Served</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% empty %}
+                    <div class="no-orders-msg">No orders yet.</div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
         </div>
+        {% endwith %}
+        {% endfor %}
+    {% else %}
+    <div class="empty-state">
+        <strong>Kitchen is quiet</strong>
+        No active tables right now.
     </div>
+    {% endif %}
+</div>
 
-    <div class="columns">
-        <div class="column col-pending">
-            <div class="column-title">
-                Pending <span class="column-count" id="count-pending">0</span>
-            </div>
-            <div id="col-pending">
-                {% for order in active_orders %}
-                {% if order.status == 'pending' %}
-                {% include 'ordering/order_card.html' with order=order %}
-                {% endif %}
-                {% empty %}
-                <div class="no-orders">No orders</div>
-                {% endfor %}
-            </div>
+<script>
+const RESTAURANT_ID = {{ restaurant.id }};
+
+function getCookie(name) {
+    const m = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+    return m ? m[2] : null;
+}
+
+function showToast(msg, color = '#2ecc71') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = color;
+    t.style.display = 'block';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.display = 'none'; }, 3500);
+}
+
+function beep(freq = 880, duration = 0.4) {
+    try {
+        const ctx = new AudioContext();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.3, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        o.start(); o.stop(ctx.currentTime + duration);
+    } catch(e) {}
+}
+
+/* ── Status update ── */
+function actionsHtml(orderId, status) {
+    if (status === 'pending')   return `<button class="btn-action btn-prepare" onclick="updateStatus(${orderId},'preparing')">Start Preparing</button><button class="btn-action btn-cancel" onclick="updateStatus(${orderId},'cancelled')">Cancel</button>`;
+    if (status === 'preparing') return `<button class="btn-action btn-ready" onclick="updateStatus(${orderId},'ready')">Mark Ready</button>`;
+    if (status === 'ready')     return `<button class="btn-action btn-served" onclick="updateStatus(${orderId},'served')">Mark Served</button>`;
+    return '';
+}
+
+function updateStatus(orderId, status) {
+    fetch('/ordering/status/update/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({ order_id: orderId, status: status }),
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.status === 'ok') applyStatusChange(orderId, status);
+    });
+}
+
+function applyStatusChange(orderId, status) {
+    const card    = document.getElementById(`order-${orderId}`);
+    if (!card) return;
+    if (status === 'cancelled') {
+        card.remove();
+    } else {
+        const badge   = card.querySelector('.status-badge');
+        const actions = document.getElementById(`actions-${orderId}`);
+        if (badge)   { badge.className = `status-badge status-${status}`; badge.textContent = status; }
+        if (actions) { actions.innerHTML = actionsHtml(orderId, status); }
+    }
+}
+
+/* ── New order from WebSocket ── */
+function buildOrderCard(order) {
+    const itemsHtml = order.items.map(i => `
+        <div class="item-row">
+            <span class="item-qty">${i.quantity}×</span>
+            <span>${i.name}</span>
         </div>
+        ${i.notes ? `<div class="item-notes" style="padding-left:26px">${i.notes}</div>` : ''}
+    `).join('');
 
-        <div class="column col-preparing">
-            <div class="column-title">
-                Preparing <span class="column-count" id="count-preparing">0</span>
-            </div>
-            <div id="col-preparing">
-                {% for order in active_orders %}
-                {% if order.status == 'preparing' %}
-                {% include 'ordering/order_card.html' with order=order %}
-                {% endif %}
-                {% endfor %}
-            </div>
+    return `
+    <div class="order-card flash-new" id="order-${order.order_id}">
+        <div class="order-meta">
+            <span class="order-id">#${order.order_id}
+                <span class="status-badge status-pending">pending</span>
+            </span>
+            <span class="order-total">₹${order.total}</span>
         </div>
-
-        <div class="column col-ready">
-            <div class="column-title">
-                Ready <span class="column-count" id="count-ready">0</span>
-            </div>
-            <div id="col-ready">
-                {% for order in active_orders %}
-                {% if order.status == 'ready' %}
-                {% include 'ordering/order_card.html' with order=order %}
-                {% endif %}
-                {% endfor %}
-            </div>
+        <div class="order-items">${itemsHtml}</div>
+        <div class="order-actions" id="actions-${order.order_id}">
+            ${actionsHtml(order.order_id, 'pending')}
         </div>
+    </div>`;
+}
 
-        <div class="column col-served">
-            <div class="column-title">
-                Served <span class="column-count" id="count-served">0</span>
-            </div>
-            <div id="col-served">
-                {% for order in active_orders %}
-                {% if order.status == 'served' %}
-                {% include 'ordering/order_card.html' with order=order %}
-                {% endif %}
-                {% empty %}
-                <div class="no-orders">No orders</div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
+/* ── WebSocket ── */
+const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+const wsUrl    = `${wsScheme}://${location.host}/ws/kitchen/${RESTAURANT_ID}/`;
+let ws, reconnectDelay = 1000, reconnectTimer = null;
 
-    <script>
-        const RESTAURANT_ID = {{ restaurant.id }};
+function connectWS() {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    ws = new WebSocket(wsUrl);
 
-        function getCookie(name) {
-            let v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
-            return v ? v[2] : null;
-        }
+    ws.onopen = () => {
+        reconnectDelay = 1000;
+        document.getElementById('ws-dot').classList.add('connected');
+        document.getElementById('ws-label').textContent = 'Live';
+    };
+    ws.onclose = () => {
+        document.getElementById('ws-dot').classList.remove('connected');
+        document.getElementById('ws-label').textContent = 'Reconnecting…';
+        reconnectTimer = setTimeout(connectWS, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+    };
 
-        function showToast(msg, color = '#2ecc71') {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.style.background = color;
-            t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
-        }
+    ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
 
-        function formatTime(isoString) {
-            const d = new Date(isoString);
-            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
+        if (data.type === 'new_order') {
+            beep(880, 0.35);
+            showToast(`New order #${data.order_id} — Table ${data.table}`, '#f39c12');
 
-        function buildCard(order) {
-            const itemsHtml = order.items.map(i =>
-                `<div class="item-row">
-        <span><span class="item-qty">${i.quantity}×</span>${i.name}</span>
-        ${i.notes ? `<span style="color:#666;font-size:11px">${i.notes}</span>` : ''}
-      </div>`
-            ).join('');
-
-            const actions = actionsFor(order.status, order.order_id);
-
-            return `
-      <div class="order-card new-flash" id="order-${order.order_id}">
-        <div class="card-header">
-          <span class="order-id">#${order.order_id}</span>
-          <span class="table-badge">Table ${order.table}</span>
-        </div>
-        <div class="order-time">${formatTime(new Date().toISOString())}</div>
-        <div class="item-list">${itemsHtml}</div>
-        <div class="card-actions">${actions}</div>
-      </div>`;
-        }
-
-        function actionsFor(status, orderId) {
-            if (status === 'pending') return `
-      <button class="btn-status btn-preparing" onclick="updateStatus(${orderId},'preparing')">Start Preparing</button>
-      <button class="btn-status btn-cancel"    onclick="updateStatus(${orderId},'cancelled')">Cancel</button>`;
-            if (status === 'preparing') return `
-      <button class="btn-status btn-ready"  onclick="updateStatus(${orderId},'ready')">Mark Ready</button>`;
-            if (status === 'ready') return `
-      <button class="btn-status btn-served" onclick="updateStatus(${orderId},'served')">Mark Served</button>`;
-            return '';
-        }
-
-        function moveCard(orderId, newStatus) {
-            const card = document.getElementById(`order-${orderId}`);
-            if (!card) return;
-
-            // update action buttons
-            card.querySelector('.card-actions').innerHTML = actionsFor(newStatus, orderId);
-            card.classList.remove('new-flash');
-
-            const colMap = { pending: 'col-pending', preparing: 'col-preparing', ready: 'col-ready', served: 'col-served' };
-            const targetCol = document.getElementById(colMap[newStatus]);
-
-            if (newStatus === 'cancelled') {
-                card.remove();
+            // Try to add the card into the correct guest column
+            const guestCol = document.getElementById(`guest-${data.customer_session_id}`);
+            if (guestCol) {
+                // Remove "no orders yet" placeholder if present
+                guestCol.querySelectorAll('.no-orders-msg').forEach(el => el.remove());
+                guestCol.insertAdjacentHTML('beforeend', buildOrderCard(data));
             } else {
-                targetCol.prepend(card);
+                // Guest column doesn't exist yet (new customer joined) — reload
+                setTimeout(() => location.reload(), 1000);
             }
-
-            updateCounts();
         }
 
-        function updateCounts() {
-            ['pending', 'preparing', 'ready', 'served'].forEach(status => {
-                const col = document.getElementById(`col-${status}`);
-                const count = col ? col.querySelectorAll('.order-card').length : 0;
-                const el = document.getElementById(`count-${status}`);
-                if (el) el.textContent = count;
-            });
+        if (data.type === 'order_status_changed') {
+            applyStatusChange(data.order_id, data.status);
         }
 
-        function updateStatus(orderId, status) {
-            fetch('/ordering/status/update/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
-                body: JSON.stringify({ order_id: orderId, status: status }),
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'ok') {
-                        moveCard(orderId, status);
-                        showToast(`Order #${orderId} → ${status}`);
-                    }
-                });
-        }
-
-        // WebSocket
-        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const wsUrl = `${wsScheme}://${window.location.host}/ws/kitchen/${RESTAURANT_ID}/`;
-        let ws;
-        let reconnectDelay = 1000;
-        const maxReconnectDelay = 30000;
-        let reconnectTimer = null;
-
-        function connectWS() {
-            if (reconnectTimer) {
-                clearTimeout(reconnectTimer);
-                reconnectTimer = null;
+        if (data.type === 'bill_requested') {
+            beep(600, 0.3);
+            showToast(`🧾 Bill Requested — Table ${data.table}`, '#f39c12');
+            const ts = document.getElementById(`ts-${data.session_id}`);
+            if (ts) {
+                const header = ts.querySelector('.table-header');
+                if (header && !header.querySelector('.bill-badge')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'bill-badge';
+                    badge.textContent = '🧾 Bill Requested';
+                    header.appendChild(badge);
+                }
             }
-
-            ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-                reconnectDelay = 1000; // reset delay
-                const statusCircle = document.getElementById('ws-status');
-                const label = document.getElementById('ws-label');
-                if (statusCircle) statusCircle.classList.add('connected');
-                if (label) label.textContent = 'Live';
-            };
-
-            ws.onclose = () => {
-                const statusCircle = document.getElementById('ws-status');
-                const label = document.getElementById('ws-label');
-                if (statusCircle) statusCircle.classList.remove('connected');
-                if (label) label.textContent = 'Reconnecting...';
-
-                reconnectTimer = setTimeout(() => {
-                    connectWS();
-                }, reconnectDelay);
-
-                // exponential backoff
-                reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
-            };
-
-            ws.onmessage = (e) => {
-                const data = JSON.parse(e.data);
-
-                if (data.type === 'new_order') {
-                    const col = document.getElementById('col-pending');
-                    // remove "no orders" placeholder if present
-                    col.querySelectorAll('.no-orders').forEach(el => el.remove());
-                    col.insertAdjacentHTML('afterbegin', buildCard(data));
-                    updateCounts();
-                    showToast(`New order #${data.order_id} — Table ${data.table}`, '#f39c12');
-                    // play a beep
-                    try {
-                        const ctx = new AudioContext();
-                        const o = ctx.createOscillator();
-                        const g = ctx.createGain();
-                        o.connect(g); g.connect(ctx.destination);
-                        o.frequency.value = 880;
-                        g.gain.setValueAtTime(0.3, ctx.currentTime);
-                        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-                        o.start(); o.stop(ctx.currentTime + 0.4);
-                    } catch (e) { }
-                }
-
-                if (data.type === 'order_status_changed') {
-                    moveCard(data.order_id, data.status);
-                }
-
-                if (data.type === 'bill_requested') {
-                    const list = document.getElementById('bill-requests-list');
-                    document.getElementById('bill-requests-panel').style.display = 'block';
-                    
-                    // Don't add duplicate if it already exists
-                    if (document.getElementById(`bill-session-${data.session_id}`)) return;
-
-                    const timeStr = new Date(data.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    const html = `
-                    <div class="bill-card new-flash" id="bill-session-${data.session_id}">
-                        <div class="bill-card-header">Table ${data.table}</div>
-                        <div class="bill-card-time">${timeStr}</div>
-                    </div>`;
-                    
-                    list.insertAdjacentHTML('beforeend', html);
-                    showToast(`🧾 Bill Requested — Table ${data.table}`, '#f39c12');
-                    
-                    try {
-                        const ctx = new AudioContext();
-                        const o = ctx.createOscillator();
-                        const g = ctx.createGain();
-                        o.connect(g); g.connect(ctx.destination);
-                        o.frequency.value = 600;
-                        g.gain.setValueAtTime(0.3, ctx.currentTime);
-                        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-                        o.start(); o.stop(ctx.currentTime + 0.3);
-                    } catch (e) { }
-                }
-
-                if (data.type === 'table_closed') {
-                    const card = document.getElementById(`bill-session-${data.session_id}`);
-                    if (card) {
-                        card.remove();
-                        const list = document.getElementById('bill-requests-list');
-                        if (list.children.length === 0) {
-                            document.getElementById('bill-requests-panel').style.display = 'none';
-                        }
-                    }
-                }
-            };
         }
 
-        connectWS();
-        updateCounts();
-    </script>
+        if (data.type === 'table_closed') {
+            const ts = document.getElementById(`ts-${data.session_id}`);
+            if (ts) ts.remove();
+
+            const main = document.querySelector('.main');
+            if (main && !main.querySelector('.table-section')) {
+                main.innerHTML = `<div class="empty-state"><strong>Kitchen is quiet</strong>No active tables right now.</div>`;
+            }
+        }
+    };
+}
+
+connectWS();
+</script>
 
 </body>
-
 </html>

@@ -336,6 +336,23 @@
 <body>
 <div style="display: none;">{% csrf_token %}</div>
 
+{% if qr_error %}
+<!-- QR error banner -->
+<div style="background:#7f1d1d;color:#fecaca;padding:10px 20px;font-size:13px;font-weight:600;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;position:sticky;top:0;z-index:999;">
+    <span>⚠️</span> {{ qr_error }}
+</div>
+{% elif not has_session %}
+<!-- Browse-only mode banner -->
+<div style="background:#1e3a5f;color:#93c5fd;padding:8px 20px;font-size:12px;font-weight:600;text-align:center;position:sticky;top:0;z-index:999;">
+    📷 Scan the QR code at your table to place an order
+</div>
+{% elif table_number %}
+<!-- Active session indicator -->
+<div style="background:#052e16;color:#86efac;padding:7px 20px;font-size:12px;font-weight:600;text-align:center;position:sticky;top:0;z-index:999;">
+    ✅ You are seated at <strong>Table {{ table_number }}</strong>
+</div>
+{% endif %}
+
 <!-- ═══════════════════════════════════════
      DESKTOP LAYOUT
      ═══════════════════════════════════════ -->
@@ -372,7 +389,7 @@
                 <button class="d-bill-btn {% if bill_requested %}done{% endif %}"
                         id="d-bill-btn"
                         onclick="requestBill()"
-                        {% if bill_requested %}disabled{% endif %}
+                        {% if bill_requested or not has_session %}disabled{% endif %}
                         style="width: 100%; padding: 12px; background: #3c2d28; color: #fff; border: none; border-radius: 8px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(60, 45, 40, 0.15);">
                     <span>🧾</span>
                     <span id="d-bill-btn-label">{% if bill_requested %}Bill Requested ✓{% else %}Request Bill{% endif %}</span>
@@ -479,7 +496,7 @@
     <button class="m-bill-btn {% if bill_requested %}done{% endif %}"
             id="mobile-bill-btn"
             onclick="requestBill()"
-            {% if bill_requested %}disabled{% endif %}>
+            {% if bill_requested or not has_session %}disabled{% endif %}>
         <span>🧾</span>
         <span id="mobile-bill-btn-label">{% if bill_requested %}Bill Requested ✓{% else %}Request Bill{% endif %}</span>
     </button>
