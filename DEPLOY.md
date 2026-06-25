@@ -1,114 +1,119 @@
 # Deploying to Railway
 
-## Prerequisites
-- GitHub account with this repo pushed
-- Railway account → [railway.app](https://railway.app) (sign up free)
+The app is already live at **`https://web-production-cac8d9.up.railway.app`**.
+This document serves as a reference for re-deploying, setting up from scratch, or onboarding a new environment.
 
 ---
 
-## Step 1 — Push the repo to GitHub
+## How Deploys Work
 
-```bash
-git init          # if not already a repo
-git add .
-git commit -m "chore: prepare for Railway deployment"
-git remote add origin https://github.com/YOUR_USERNAME/ar-main.git
-git push -u origin main
-```
+Every push to the `main` branch on GitHub triggers an automatic Railway deploy:
 
----
+| Phase | What runs |
+|---|---|
+| **Build** | `bash build.sh` → `pip install -r requirements.txt` + `python manage.py collectstatic` |
+| **Start** | `python manage.py migrate && daphne -b 0.0.0.0 -p $PORT core.asgi:application` |
 
-## Step 2 — Create a new Railway project
-
-1. Go to [railway.app/new](https://railway.app/new)
-2. Click **Deploy from GitHub repo** → select your `ar-main` repository
-3. Railway will detect the `railway.toml` and `Procfile` automatically
+Static files are served by **WhiteNoise** middleware directly from Daphne — no separate nginx needed.
 
 ---
 
-## Step 3 — Add PostgreSQL plugin
+## Required Environment Variables
 
-1. In your Railway project dashboard, click **+ New**
-2. Select **Database → Add PostgreSQL**
-3. Railway will automatically inject `DATABASE_URL` into your web service
-
----
-
-## Step 4 — Add Redis plugin
-
-1. Click **+ New** again
-2. Select **Database → Add Redis**
-3. Railway will automatically inject `REDIS_URL` into your web service
-
----
-
-## Step 5 — Set environment variables
-
-In your **web service → Variables tab**, add:
+Set these in Railway → web service → **Variables** tab:
 
 | Variable | Value |
 |---|---|
 | `DJANGO_SETTINGS_MODULE` | `core.settings.prod` |
-| `SECRET_KEY` | Run command below to generate |
-| `ALLOWED_HOSTS` | `yourapp.up.railway.app` (set after first deploy) |
+| `SECRET_KEY` | Generate with command below |
+| `ALLOWED_HOSTS` | Your Railway domain e.g. `web-production-cac8d9.up.railway.app` |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` ← Railway reference syntax |
+| `REDIS_URL` | `${{Redis.REDIS_URL}}` ← Railway reference syntax |
 
-Generate a secure SECRET_KEY locally:
+> **Important**: `DATABASE_URL` and `REDIS_URL` must be set as **reference variables** using Railway's `${{ServiceName.VAR}}` syntax — they are not auto-injected automatically.
+
+Generate a SECRET_KEY:
 ```bash
 python3 -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
 ---
 
-## Step 6 — Deploy
+## Setting Up from Scratch
 
-Railway auto-deploys on every push to `main`. The build script will:
-1. `pip install -r requirements.txt`
-2. `python manage.py collectstatic --no-input`
-3. `python manage.py migrate`
+### Step 1 — Push to GitHub
+```bash
+git add .
+git commit -m "chore: initial commit"
+git push origin main
+```
 
-Then Daphne starts on Railway's assigned `$PORT`.
+### Step 2 — Create Railway project
+1. Go to [railway.app/new](https://railway.app/new)
+2. **Deploy from GitHub repo** → select `Restaurant-Ordering-System-Ar-`
+3. Railway detects `railway.toml` and `Procfile` automatically
+
+### Step 3 — Add PostgreSQL + Redis plugins
+- Click **+ New** → **Database → PostgreSQL**
+- Click **+ New** → **Database → Redis**
+
+### Step 4 — Set environment variables
+Add all 5 variables from the table above in the web service Variables tab.
+
+### Step 5 — Deploy
+Railway auto-deploys on push. Or click **Deploy** manually.
 
 ---
 
-## Step 7 — Create a superuser
+## Creating a Superuser (Production)
 
-Once deployed, open a Railway shell (service → **Shell** tab):
+Railway's database uses an **internal hostname** (`postgres.railway.internal`) that is only reachable inside Railway's network. To create a superuser from your local machine, use the **public URL**:
+
+1. Go to Railway → **Postgres** service → **Variables** tab
+2. Copy `DATABASE_PUBLIC_URL`
+3. Run this single command locally:
 
 ```bash
-python manage.py createsuperuser
+DATABASE_URL="<paste DATABASE_PUBLIC_URL here>" DJANGO_SETTINGS_MODULE=core.settings.prod python3 manage.py createsuperuser
 ```
 
-Then go to `https://yourapp.up.railway.app/admin/` to add your restaurant, categories, and menu items.
+> Do not use `railway run` — it overrides `DATABASE_URL` with the internal URL.
 
 ---
 
-## Step 8 — Update ALLOWED_HOSTS
+## Accessing the App
 
-After your first deploy, Railway gives you a domain like `ar-main-production.up.railway.app`.
-Update the `ALLOWED_HOSTS` variable to match:
+| Page | URL |
+|---|---|
+| Django Admin | `https://web-production-cac8d9.up.railway.app/admin/` |
+| Customer Menu | `https://web-production-cac8d9.up.railway.app/<restaurant-slug>/?table=1` |
+| Kitchen Dashboard | `https://web-production-cac8d9.up.railway.app/ordering/kitchen/<restaurant_id>/` |
+| Billing Dashboard | `https://web-production-cac8d9.up.railway.app/ordering/billing/` |
 
-```
-ar-main-production.up.railway.app
-```
-
----
-
-## Media Files (AR Models)
-
-> **Important**: Railway's ephemeral filesystem means uploaded files (`.glb`, `.usdz` AR models)
-> are wiped on every redeploy.
->
-> For persistent media in production, integrate cloud storage:
-> - [Cloudinary](https://cloudinary.com) — free tier, easy Django integration via `django-cloudinary-storage`
-> - [AWS S3 / Backblaze B2](https://django-storages.readthedocs.io) — via `django-storages`
->
-> For now, you can pre-upload AR models and they will persist between deploys as long as you
-> don't redeploy. A full cloud storage integration can be added as a next step.
+Find the `restaurant_id` in Django Admin → Restaurants → click a restaurant → the number in the URL (`/admin/restaurants/restaurant/**1**/change/`) is the ID.
 
 ---
 
-## Local dev reminder
+## Media Files (AR Models) — Known Limitation
+
+Railway's filesystem is **ephemeral** — uploaded `.glb` and `.usdz` AR model files are wiped on every redeploy.
+
+For persistent media in production, integrate cloud storage (see `TODO.md`):
+- [Cloudinary](https://cloudinary.com) via `django-cloudinary-storage` (recommended, free tier)
+- [AWS S3](https://django-storages.readthedocs.io) via `django-storages`
+- [Railway Volumes](https://docs.railway.app/reference/volumes) (simplest for Railway, paid)
+
+---
+
+## Local Development
 
 ```bash
-python3 manage.py runserver   # uses core.settings.dev + local PostgreSQL + local Redis
+# Start PostgreSQL and Redis (Homebrew services)
+brew services start postgresql@16
+brew services start redis
+
+# Run dev server (uses core.settings.dev + local PostgreSQL)
+python3 manage.py runserver
 ```
+
+Local app runs at `http://127.0.0.1:8000/`.
