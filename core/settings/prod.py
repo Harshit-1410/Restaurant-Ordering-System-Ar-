@@ -8,12 +8,15 @@ Required Railway environment variables:
   DATABASE_URL            = <auto-injected by Railway PostgreSQL plugin>
   REDIS_URL               = <auto-injected by Railway Redis plugin>
 
-Cloudflare R2 media storage (optional — falls back to ephemeral local storage):
-  R2_ACCOUNT_ID       = your Cloudflare account ID
-  R2_ACCESS_KEY_ID    = R2 API token access key
-  R2_SECRET_ACCESS_KEY = R2 API token secret key
-  R2_BUCKET_NAME      = your bucket name  (e.g. ar-restaurant-media)
-  R2_PUBLIC_DOMAIN    = pub-xxxx.r2.dev  (from bucket → Public Access tab)
+S3-compatible media storage — works with Backblaze B2 (recommended, no CC),
+Cloudflare R2, or any S3-compatible provider.  Falls back to Railway's
+ephemeral local filesystem if any variable is missing.
+
+  S3_ENDPOINT_URL      = https://s3.us-west-004.backblazeb2.com   (B2 example)
+  S3_ACCESS_KEY_ID     = your key ID
+  S3_SECRET_ACCESS_KEY = your application key / secret
+  S3_BUCKET_NAME       = your bucket name  (e.g. ar-restaurant-media)
+  S3_PUBLIC_DOMAIN     = f000.backblazeb2.com  (optional — friendly URL)
 """
 
 import dj_database_url
@@ -45,30 +48,28 @@ CHANNEL_LAYERS = {
 }
 
 # ---------------------------------------------------------------------------
-# Cloudflare R2 — persistent CDN-backed media storage.
-# Free tier: 10 GB storage, 1 M writes/month, no egress fees, no file-size cap.
-# All four R2_* variables must be set; if any are missing the app falls back
-# to Railway's ephemeral local filesystem (files lost on redeploy).
+# S3-compatible object storage for persistent media files.
+# Recommended: Backblaze B2 — free tier, no credit card required.
+#   Sign up at backblaze.com → Create Bucket (Public) → App Keys → Add Key
 # ---------------------------------------------------------------------------
-_r2_account_id    = config('R2_ACCOUNT_ID',        default='')
-_r2_access_key    = config('R2_ACCESS_KEY_ID',      default='')
-_r2_secret_key    = config('R2_SECRET_ACCESS_KEY',  default='')
-_r2_bucket        = config('R2_BUCKET_NAME',        default='')
-_r2_public_domain = config('R2_PUBLIC_DOMAIN',      default='')  # pub-xxx.r2.dev
+_s3_endpoint = config('S3_ENDPOINT_URL',      default='')
+_s3_key_id   = config('S3_ACCESS_KEY_ID',     default='')
+_s3_secret   = config('S3_SECRET_ACCESS_KEY', default='')
+_s3_bucket   = config('S3_BUCKET_NAME',       default='')
+_s3_domain   = config('S3_PUBLIC_DOMAIN',     default='')  # optional friendly URL
 
-if _r2_account_id and _r2_access_key and _r2_secret_key and _r2_bucket:
-    AWS_ACCESS_KEY_ID       = _r2_access_key
-    AWS_SECRET_ACCESS_KEY   = _r2_secret_key
-    AWS_STORAGE_BUCKET_NAME = _r2_bucket
-    AWS_S3_ENDPOINT_URL     = f'https://{_r2_account_id}.r2.cloudflarestorage.com'
-    AWS_QUERYSTRING_AUTH    = False   # serve public URLs, no expiring signed tokens
-    AWS_DEFAULT_ACL         = None    # R2 uses bucket-level public access, not per-object ACLs
-    AWS_S3_FILE_OVERWRITE   = False   # keep old file if same name is re-uploaded
-    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}  # 1-day browser cache
+if _s3_endpoint and _s3_key_id and _s3_secret and _s3_bucket:
+    AWS_ACCESS_KEY_ID       = _s3_key_id
+    AWS_SECRET_ACCESS_KEY   = _s3_secret
+    AWS_STORAGE_BUCKET_NAME = _s3_bucket
+    AWS_S3_ENDPOINT_URL     = _s3_endpoint
+    AWS_DEFAULT_ACL         = 'public-read'   # bucket must allow public read
+    AWS_QUERYSTRING_AUTH    = False            # plain public URLs, no expiry tokens
+    AWS_S3_FILE_OVERWRITE   = False
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
 
-    if _r2_public_domain:
-        # Files will be served as https://<r2_public_domain>/<key>
-        AWS_S3_CUSTOM_DOMAIN = _r2_public_domain
+    if _s3_domain:
+        AWS_S3_CUSTOM_DOMAIN = _s3_domain
 
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
