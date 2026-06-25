@@ -28,15 +28,22 @@ def menu(request, restaurant_slug):
 def menu_item_detail(request, item_id):
     """JSON endpoint — returns all data needed for the item detail modal."""
     item = get_object_or_404(MenuItem, id=item_id, is_available=True)
+
+    def safe_url(field):
+        try:
+            return field.url if field else None
+        except Exception:
+            return None
+
     return JsonResponse({
-        'id':          item.id,
-        'name':        item.name,
-        'description': item.description,
-        'price':       str(item.price),
-        'category':    item.category.name,
-        'is_veg':      item.is_veg,
-        'image':       item.image.url if item.image else None,
-        'ar_glb':      item.ar_model_file.url if item.ar_model_file else None,
-        'ar_usdz':     item.ar_model_usdz.url if item.ar_model_usdz else None,
+        'id':           item.id,
+        'name':         item.name,
+        'description':  item.description,
+        'price':        str(item.price),
+        'category':     item.category.name,
+        'is_veg':       item.is_veg,
+        'image':        safe_url(item.image),
+        'ar_glb':       safe_url(item.ar_model_file),
+        'ar_usdz':      safe_url(item.ar_model_usdz),
         'ar_has_model': item.ar_has_model,
     })
