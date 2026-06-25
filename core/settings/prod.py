@@ -10,7 +10,8 @@ Required Railway environment variables:
   CLOUDINARY_URL          = cloudinary://api_key:api_secret@cloud_name
 """
 
-import cloudinary
+import os as _os
+
 import dj_database_url
 from decouple import Csv, config
 
@@ -42,11 +43,20 @@ CHANNEL_LAYERS = {
 
 # Cloudinary — persistent media storage for AR models and food images.
 # dev.py uses local MEDIA_ROOT; prod uses Cloudinary so files survive redeploys.
-INSTALLED_APPS = INSTALLED_APPS + ['cloudinary_storage', 'cloudinary']  # noqa: F405
+# CLOUDINARY_URL is optional: if not set, media falls back to local MEDIA_ROOT.
+_cloudinary_url = config('CLOUDINARY_URL', default='')
 
-cloudinary.config(cloudinary_url=config('CLOUDINARY_URL'))
+if _cloudinary_url:
+    # Pop from os.environ BEFORE importing cloudinary — the library auto-parses
+    # CLOUDINARY_URL at module load time and raises ValueError for any invalid format.
+    # We clear it here and configure explicitly so we control the error surface.
+    _os.environ.pop('CLOUDINARY_URL', None)
 
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    import cloudinary  # noqa: PLC0415
+
+    INSTALLED_APPS = INSTALLED_APPS + ['cloudinary_storage', 'cloudinary']  # noqa: F405
+    cloudinary.config(cloudinary_url=_cloudinary_url)
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # Railway terminates SSL at the load balancer and forwards HTTP internally.
 # SECURE_SSL_REDIRECT must be False or Railway's health checker gets redirect-looped.
