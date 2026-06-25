@@ -34,10 +34,10 @@ class CustomerSessionInline(admin.TabularInline):
 
 @admin.register(Table)
 class TableAdmin(admin.ModelAdmin):
-    list_display  = ['table_number', 'restaurant', 'is_active', 'qr_token_short', 'qr_url_link']
-    list_filter   = ['restaurant', 'is_active']
+    list_display    = ['table_number', 'restaurant', 'is_active', 'qr_token_short', 'qr_url_link']
+    list_filter     = ['restaurant', 'is_active']
     readonly_fields = ['qr_token', 'qr_url_link']
-    search_fields = ['table_number', 'restaurant__name']
+    search_fields   = ['table_number', 'restaurant__name']
 
     fieldsets = [
         (None, {
@@ -46,23 +46,35 @@ class TableAdmin(admin.ModelAdmin):
         ('QR Code', {
             'fields': ['qr_token', 'qr_url_link'],
             'description': (
-                'Copy the QR URL and paste it into any QR-code generator. '
-                'Use "Rotate Token" action to invalidate printed codes.'
+                'Copy the full URL below and paste it into any QR-code generator '
+                '(e.g. qr-code-generator.com). '
+                'Use "Rotate Token" to invalidate old printed codes.'
             ),
         }),
     ]
 
     actions = ['rotate_qr_token']
 
+    # ── Store request so display methods can build absolute URLs ──────────
+    def changelist_view(self, request, *args, **kwargs):
+        self._request = request
+        return super().changelist_view(request, *args, **kwargs)
+
+    def changeform_view(self, request, *args, **kwargs):
+        self._request = request
+        return super().changeform_view(request, *args, **kwargs)
+
+    # ── Display helpers ───────────────────────────────────────────────────
     @admin.display(description='QR Token (preview)')
     def qr_token_short(self, obj):
         return obj.qr_token[:16] + '…'
 
-    @admin.display(description='QR URL')
+    @admin.display(description='QR URL (full — paste into QR generator)')
     def qr_url_link(self, obj):
-        url = obj.qr_menu_url()
+        request = getattr(self, '_request', None)
+        url     = obj.qr_menu_url(request)   # absolute when request is available
         return format_html(
-            '<code style="word-break:break-all">{}</code>',
+            '<code style="word-break:break-all;user-select:all">{}</code>',
             url,
         )
 
@@ -71,7 +83,10 @@ class TableAdmin(admin.ModelAdmin):
         for table in queryset:
             table.rotate_token()
         count = queryset.count()
-        self.message_user(request, f'{count} QR token(s) rotated. Re-print the affected QR codes.')
+        self.message_user(
+            request,
+            f'{count} QR token(s) rotated. Re-print the affected QR codes.',
+        )
 
 
 # ── TableSession ──────────────────────────────────────────────────────────────
