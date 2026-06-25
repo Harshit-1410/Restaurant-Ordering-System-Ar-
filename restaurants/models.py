@@ -2,6 +2,24 @@
 
 from django.db import models
 
+
+def _ar_storage():
+    """
+    Return RawMediaCloudinaryStorage when cloudinary_storage is active (production),
+    or fall back to FileSystemStorage in development.
+    Raw resource type is required for non-image binary files (.glb, .usdz).
+    """
+    from django.conf import settings
+    if 'cloudinary_storage' in getattr(settings, 'INSTALLED_APPS', []):
+        try:
+            from cloudinary_storage.storage import RawMediaCloudinaryStorage
+            return RawMediaCloudinaryStorage()
+        except ImportError:
+            pass
+    from django.core.files.storage import FileSystemStorage
+    return FileSystemStorage()
+
+
 class Restaurant(models.Model):
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)  # used in QR code URL
@@ -33,8 +51,8 @@ class MenuItem(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=8, decimal_places=2)
     image = models.ImageField(upload_to='menu_items/', blank=True, null=True)
-    ar_model_file = models.FileField(upload_to='ar_models/', blank=True, null=True)   # .glb  — Android / WebXR / desktop 3D
-    ar_model_usdz = models.FileField(upload_to='ar_models/', blank=True, null=True)   # .usdz — iOS Safari AR Quick Look
+    ar_model_file = models.FileField(upload_to='ar_models/', blank=True, null=True, storage=_ar_storage)   # .glb  — Android / WebXR / desktop 3D
+    ar_model_usdz = models.FileField(upload_to='ar_models/', blank=True, null=True, storage=_ar_storage)   # .usdz — iOS Safari AR Quick Look
     is_veg = models.BooleanField(default=True)
     is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
