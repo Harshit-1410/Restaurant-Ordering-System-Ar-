@@ -242,7 +242,8 @@
         });
 
         /* ─── WebSocket Logic ─── */
-        const wsUrl = `ws://${window.location.host}/ws/kitchen/${RESTAURANT_ID}/`;
+        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${wsScheme}://${window.location.host}/ws/kitchen/${RESTAURANT_ID}/`;
         let ws;
         let reconnectDelay = 1000;
         const maxReconnectDelay = 30000;

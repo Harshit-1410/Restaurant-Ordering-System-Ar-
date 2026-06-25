@@ -196,7 +196,8 @@
         }
 
         function connectWS() {
-            const ws   = new WebSocket(`ws://${location.host}/ws/order/${ORDER_ID}/`);
+            const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const ws   = new WebSocket(`${wsScheme}://${location.host}/ws/order/${ORDER_ID}/`);
             const dot  = document.getElementById('ws-dot');
 
             ws.onopen  = () => dot.classList.add('connected');
