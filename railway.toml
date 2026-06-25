@@ -3,7 +3,7 @@ builder = "nixpacks"
 buildCommand = "bash build.sh"
 
 [deploy]
-startCommand = "daphne -b 0.0.0.0 -p $PORT core.asgi:application"
+startCommand = "DJANGO_SETTINGS_MODULE=core.settings.prod daphne -b 0.0.0.0 -p $PORT core.asgi:application"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

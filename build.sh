@@ -2,6 +2,8 @@
 # Railway build script — runs on every deploy before the service starts.
 set -o errexit
 
+export DJANGO_SETTINGS_MODULE=core.settings.prod
+
 pip install -r requirements.txt
 
 python manage.py collectstatic --no-input
