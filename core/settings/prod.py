@@ -7,11 +7,14 @@ Required Railway environment variables:
   ALLOWED_HOSTS           = yourdomain.up.railway.app
   DATABASE_URL            = <auto-injected by Railway PostgreSQL plugin>
   REDIS_URL               = <auto-injected by Railway Redis plugin>
-  CLOUDINARY_URL          = cloudinary://api_key:api_secret@cloud_name
-"""
 
-import os as _os
-from urllib.parse import urlparse as _urlparse
+Cloudflare R2 media storage (optional — falls back to ephemeral local storage):
+  R2_ACCOUNT_ID       = your Cloudflare account ID
+  R2_ACCESS_KEY_ID    = R2 API token access key
+  R2_SECRET_ACCESS_KEY = R2 API token secret key
+  R2_BUCKET_NAME      = your bucket name  (e.g. ar-restaurant-media)
+  R2_PUBLIC_DOMAIN    = pub-xxxx.r2.dev  (from bucket → Public Access tab)
+"""
 
 import dj_database_url
 from decouple import Csv, config
@@ -32,7 +35,6 @@ DATABASES = {
 }
 
 # Railway injects REDIS_URL from the Redis plugin automatically.
-# Override the base CHANNEL_LAYERS to use that URL directly.
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
@@ -42,43 +44,37 @@ CHANNEL_LAYERS = {
     },
 }
 
-# Cloudinary — persistent media storage for AR models and food images.
-# dev.py uses local MEDIA_ROOT; prod uses Cloudinary so files survive redeploys.
-# CLOUDINARY_URL is optional: if not set, media falls back to local MEDIA_ROOT.
-#
-# django-cloudinary-storage reads credentials from settings.CLOUDINARY_STORAGE,
-# NOT from os.environ directly.  We parse CLOUDINARY_URL ourselves and populate
-# that dict so set_credentials() in app_settings.py works correctly.
-_cloudinary_url = config('CLOUDINARY_URL', default='')
+# ---------------------------------------------------------------------------
+# Cloudflare R2 — persistent CDN-backed media storage.
+# Free tier: 10 GB storage, 1 M writes/month, no egress fees, no file-size cap.
+# All four R2_* variables must be set; if any are missing the app falls back
+# to Railway's ephemeral local filesystem (files lost on redeploy).
+# ---------------------------------------------------------------------------
+_r2_account_id    = config('R2_ACCOUNT_ID',        default='')
+_r2_access_key    = config('R2_ACCESS_KEY_ID',      default='')
+_r2_secret_key    = config('R2_SECRET_ACCESS_KEY',  default='')
+_r2_bucket        = config('R2_BUCKET_NAME',        default='')
+_r2_public_domain = config('R2_PUBLIC_DOMAIN',      default='')  # pub-xxx.r2.dev
 
-if _cloudinary_url:
-    try:
-        # Parse cloudinary://api_key:api_secret@cloud_name
-        _parsed = _urlparse(_cloudinary_url)
-        _cloud_name = _parsed.hostname      # e.g. 'mycloudname'
-        _api_key    = _parsed.username
-        _api_secret = _parsed.password
+if _r2_account_id and _r2_access_key and _r2_secret_key and _r2_bucket:
+    AWS_ACCESS_KEY_ID       = _r2_access_key
+    AWS_SECRET_ACCESS_KEY   = _r2_secret_key
+    AWS_STORAGE_BUCKET_NAME = _r2_bucket
+    AWS_S3_ENDPOINT_URL     = f'https://{_r2_account_id}.r2.cloudflarestorage.com'
+    AWS_QUERYSTRING_AUTH    = False   # serve public URLs, no expiring signed tokens
+    AWS_DEFAULT_ACL         = None    # R2 uses bucket-level public access, not per-object ACLs
+    AWS_S3_FILE_OVERWRITE   = False   # keep old file if same name is re-uploaded
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}  # 1-day browser cache
 
-        if _cloud_name and _api_key and _api_secret:
-            # Pop from os.environ so the cloudinary package does not try to
-            # auto-parse it at import time (raises ValueError for bad formats).
-            _os.environ.pop('CLOUDINARY_URL', None)
+    if _r2_public_domain:
+        # Files will be served as https://<r2_public_domain>/<key>
+        AWS_S3_CUSTOM_DOMAIN = _r2_public_domain
 
-            INSTALLED_APPS = INSTALLED_APPS + ['cloudinary_storage', 'cloudinary']  # noqa: F405
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-            # django-cloudinary-storage's set_credentials() reads this dict.
-            CLOUDINARY_STORAGE = {  # noqa: F405
-                'CLOUD_NAME': _cloud_name,
-                'API_KEY':    _api_key,
-                'API_SECRET': _api_secret,
-            }
-
-            DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-    except Exception:
-        pass  # Malformed CLOUDINARY_URL — fall back to local (ephemeral) storage
-
-# Railway terminates SSL at the load balancer and forwards HTTP internally.
-# SECURE_SSL_REDIRECT must be False or Railway's health checker gets redirect-looped.
+# ---------------------------------------------------------------------------
+# Security — Railway terminates SSL at the load balancer.
+# ---------------------------------------------------------------------------
 SECURE_SSL_REDIRECT = False
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_HSTS_SECONDS = 31536000

@@ -5,13 +5,20 @@ from django.db import models
 
 def _ar_storage():
     """
-    AR model files (.glb / .usdz) are always stored on the local filesystem.
-    They are committed to git so they survive Railway redeploys, and served
-    via a permanent /media/ar_models/ route added to urls.py.
-    Using Cloudinary for these files is intentionally avoided: the binary files
-    are too large for the free-tier upload limit and require 'raw' resource type
-    which conflicts with DEFAULT_FILE_STORAGE = MediaCloudinaryStorage.
+    Returns the active media storage backend so AR model files (.glb / .usdz)
+    go to the same place as food images.
+
+    Production:  DEFAULT_FILE_STORAGE = S3Boto3Storage (Cloudflare R2)
+                 → files uploaded to R2, served from Cloudflare CDN.
+    Development: DEFAULT_FILE_STORAGE not overridden
+                 → files saved to local MEDIA_ROOT / ar_models/.
     """
+    from django.conf import settings
+    dfs = getattr(settings, 'DEFAULT_FILE_STORAGE', '')
+    if dfs and 'FileSystem' not in dfs:
+        # A cloud backend is active (e.g. S3Boto3Storage for R2).
+        from django.core.files.storage import default_storage
+        return default_storage
     from django.core.files.storage import FileSystemStorage
     return FileSystemStorage()
 
