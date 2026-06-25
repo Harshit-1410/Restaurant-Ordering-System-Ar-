@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'channels',
     'restaurants',
     'ordering',
+    'billing',
 ]
 
 MIDDLEWARE = [

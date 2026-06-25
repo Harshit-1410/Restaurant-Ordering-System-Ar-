@@ -1,0 +1,169 @@
+{% extends "billing/base.html" %}
+
+{% block title %}Reports & Analytics{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block nav_reports %}active{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 20px; }
+    .chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .chart-title { font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+    .chart-wrap { position: relative; height: 240px; }
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 12px; margin-bottom: 20px; }
+    .kpi-mini { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .kpi-mini .val { font-size: 22px; font-weight: 800; margin-bottom: 2px; }
+    .kpi-mini .lbl { font-size: 11px; color: var(--muted); }
+    @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="kpi-row">
+    <div class="kpi-mini">
+        <div class="val" style="color:var(--success)">₹{{ stats.today_revenue|floatformat:0 }}</div>
+        <div class="lbl">Today's Revenue</div>
+    </div>
+    <div class="kpi-mini">
+        <div class="val">{{ stats.today_bills }}</div>
+        <div class="lbl">Bills Today</div>
+    </div>
+    <div class="kpi-mini">
+        <div class="val">₹{{ stats.avg_bill_value|floatformat:0 }}</div>
+        <div class="lbl">Avg Bill Value</div>
+    </div>
+    <div class="kpi-mini">
+        <div class="val" style="color:var(--accent)">{{ stats.customers_served }}</div>
+        <div class="lbl">Customers Today</div>
+    </div>
+</div>
+
+<div style="display:flex;gap:10px;margin-bottom:16px">
+    <button class="btn btn-ghost btn-sm active-period" id="btn-7d" onclick="switchPeriod('7d')">Last 7 Days</button>
+    <button class="btn btn-ghost btn-sm" id="btn-30d" onclick="switchPeriod('30d')">Last 30 Days</button>
+</div>
+
+<div class="charts-grid">
+    <!-- Revenue chart -->
+    <div class="chart-card">
+        <div class="chart-title">📈 Revenue Trend</div>
+        <div class="chart-wrap">
+            <canvas id="revenue-chart"></canvas>
+        </div>
+    </div>
+
+    <!-- Payment distribution -->
+    <div class="chart-card">
+        <div class="chart-title">💳 Payment Methods (30 days)</div>
+        <div class="chart-wrap">
+            <canvas id="payment-chart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Top Items -->
+<div class="card" style="margin-top:20px">
+    <div class="card-title" style="margin-bottom:14px">🏆 Top Selling Items (30 days)</div>
+    {% if top_items %}
+    <table class="data-table">
+        <thead>
+            <tr><th>Item</th><th>Qty Sold</th></tr>
+        </thead>
+        <tbody>
+        {% for item in top_items %}
+        <tr>
+            <td>{{ item.menu_item__name }}</td>
+            <td>{{ item.total_qty }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">
+        No sales data for the last 30 days yet
+    </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const data7d  = {{ rev_7days|safe }};
+const data30d = {{ rev_30days|safe }};
+
+const payLabels = {{ pay_labels|safe }};
+const payValues = {{ pay_values|safe }};
+
+let revenueChart;
+
+function buildRevenueChart(dataset) {
+    const ctx = document.getElementById('revenue-chart').getContext('2d');
+    if (revenueChart) revenueChart.destroy();
+    revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dataset.map(r => r.date),
+            datasets: [{
+                label: 'Revenue (₹)',
+                data: dataset.map(r => r.revenue),
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99,102,241,.12)',
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#6366f1',
+                pointRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: '#23262f' }, ticks: { color: '#6b7280', font: { size: 11 } } },
+                y: {
+                    grid: { color: '#23262f' }, ticks: { color: '#6b7280', font: { size: 11 },
+                        callback: v => '₹' + v.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+}
+
+function buildPaymentChart() {
+    if (!payLabels.length) return;
+    const ctx = document.getElementById('payment-chart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: payLabels,
+            datasets: [{
+                data: payValues,
+                backgroundColor: ['#6366f1','#22c55e','#f59e0b','#ef4444'],
+                borderWidth: 0,
+                hoverOffset: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#9ca3af', font: { size: 12 }, padding: 16 }
+                }
+            }
+        }
+    });
+}
+
+function switchPeriod(p) {
+    document.getElementById('btn-7d').style.background  = p === '7d'  ? 'var(--accent)' : '';
+    document.getElementById('btn-30d').style.background = p === '30d' ? 'var(--accent)' : '';
+    buildRevenueChart(p === '7d' ? data7d : data30d);
+}
+
+buildRevenueChart(data7d);
+buildPaymentChart();
+document.getElementById('btn-7d').style.background = 'var(--accent)';
+</script>
+{% endblock %}

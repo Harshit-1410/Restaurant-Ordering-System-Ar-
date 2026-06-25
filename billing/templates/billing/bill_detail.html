@@ -1,0 +1,434 @@
+{% extends "billing/base.html" %}
+
+{% block title %}Bill — Table {{ ts.table.table_number }}{% endblock %}
+{% block page_title %}Table {{ ts.table.table_number }} — Bill Detail{% endblock %}
+{% block nav_open %}active{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .detail-layout {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 20px;
+        align-items: start;
+    }
+    .sticky-panel { position: sticky; top: 72px; }
+    .guest-block { margin-bottom: 20px; }
+    .guest-label {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.6px; color: var(--muted);
+        padding: 0 0 8px; border-bottom: 1px solid var(--border);
+        margin-bottom: 10px;
+    }
+    .order-block { margin-bottom: 12px; padding: 12px; background: rgba(255,255,255,.03); border-radius: 8px; }
+    .order-meta { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+    .item-row {
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.04);
+        font-size: 13px;
+    }
+    .item-row:last-child { border-bottom: none; }
+    .item-qty { width: 24px; text-align: center; font-weight: 700; color: var(--accent); }
+    .item-name { flex: 1; }
+    .item-price { color: var(--muted); font-size: 12px; }
+    .item-sub { font-weight: 600; min-width: 56px; text-align: right; }
+    .item-cancelled { text-decoration: line-through; opacity: .45; }
+    .item-notes { font-size: 11px; color: var(--muted); grid-column: 2 / -1; padding-left: 32px; }
+
+    /* Summary panel */
+    .summary-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 7px 0; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-row.grand { font-size: 18px; font-weight: 800; color: var(--success); padding-top: 12px; }
+    .summary-label { color: var(--muted); }
+    .summary-discount { color: var(--success); }
+
+    /* Toggle sections */
+    .section-toggle {
+        cursor: pointer; user-select: none;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 0 10px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+        font-size: 13px; font-weight: 700;
+    }
+    .section-toggle .arrow { color: var(--muted); transition: transform .2s; }
+    .section-toggle.collapsed .arrow { transform: rotate(-90deg); }
+    .section-body { overflow: hidden; }
+    .section-body.hidden { display: none; }
+
+    .payment-tag {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 10px; background: rgba(255,255,255,.03);
+        border-radius: 7px; margin-bottom: 6px; font-size: 13px;
+    }
+    .payment-tag .del-btn {
+        background: none; border: none; color: var(--muted);
+        cursor: pointer; font-size: 14px; padding: 0 4px;
+        transition: color .15s;
+    }
+    .payment-tag .del-btn:hover { color: var(--danger); }
+    .amount-due-bar {
+        background: rgba(255,255,255,.04); border-radius: 8px;
+        padding: 12px; text-align: center; margin: 10px 0;
+    }
+    .amount-due-bar .label { font-size: 11px; color: var(--muted); }
+    .amount-due-bar .value { font-size: 22px; font-weight: 800; }
+    .method-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; margin-bottom: 10px; }
+    .method-btn {
+        padding: 9px; border-radius: 7px;
+        border: 2px solid var(--border); background: none; color: var(--muted);
+        font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
+        text-align: center;
+    }
+    .method-btn:hover,
+    .method-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,.08); }
+
+    @media (max-width: 900px) {
+        .detail-layout { grid-template-columns: 1fr; }
+        .sticky-panel { position: relative; top: 0; }
+    }
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'billing:open_bills' %}" class="btn btn-ghost btn-sm">← Back</a>
+{% if bill.is_paid %}
+<a href="{% url 'billing:receipt' bill.id %}" class="btn btn-ghost btn-sm" target="_blank">🖨️ Print Receipt</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- Bill meta info -->
+<div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+    <div class="card" style="flex:1;min-width:200px;padding:14px 18px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:3px">Bill Number</div>
+        <div style="font-size:15px;font-weight:700;font-family:monospace">{{ bill.bill_number }}</div>
+    </div>
+    <div class="card" style="flex:1;min-width:140px;padding:14px 18px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:3px">Status</div>
+        <span class="badge badge-{{ bill.status }}">{{ bill.get_status_display }}</span>
+    </div>
+    <div class="card" style="flex:1;min-width:140px;padding:14px 18px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:3px">Guests</div>
+        <div style="font-size:15px;font-weight:700">{{ bill.customer_count }}</div>
+    </div>
+    <div class="card" style="flex:1;min-width:160px;padding:14px 18px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:3px">Dining Time</div>
+        <div style="font-size:15px;font-weight:700">{{ bill.dining_duration }}</div>
+    </div>
+    <div class="card" style="flex:1;min-width:140px;padding:14px 18px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:3px">Cashier</div>
+        <div style="font-size:15px;font-weight:700">{{ bill.cashier.get_full_name|default:bill.cashier.username }}</div>
+    </div>
+</div>
+
+{% if bill.is_paid %}
+<div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;padding:14px 18px;margin-bottom:20px;color:#86efac;font-weight:600;font-size:14px;">
+    ✓ Bill paid on {{ bill.paid_at|date:"d M Y" }} at {{ bill.paid_at|time:"H:i" }}. This bill is now immutable.
+</div>
+{% endif %}
+
+<div class="detail-layout">
+
+    <!-- LEFT — Orders by customer -->
+    <div>
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">🛒 Order Items</div>
+                {% if not bill.is_paid %}
+                <button class="btn btn-ghost btn-sm" onclick="recalcBill()">↺ Recalc</button>
+                {% endif %}
+            </div>
+            {% for group in customer_groups %}
+            <div class="guest-block">
+                <div class="guest-label">{{ group.label }}</div>
+                {% for order in group.orders %}
+                <div class="order-block">
+                    <div class="order-meta">Order #{{ order.id }} · {{ order.created_at|time:"H:i" }} · <span class="badge badge-{{ order.status }}">{{ order.get_status_display }}</span></div>
+                    {% for item in order.items.all %}
+                    <div class="item-row {% if order.status == 'cancelled' %}item-cancelled{% endif %}">
+                        <div class="item-qty">{{ item.quantity }}</div>
+                        <div class="item-name">{{ item.menu_item.name }}</div>
+                        <div class="item-price">₹{{ item.unit_price }}</div>
+                        <div class="item-sub">₹{{ item.subtotal }}</div>
+                    </div>
+                    {% if item.notes %}
+                    <div class="item-notes">Note: {{ item.notes }}</div>
+                    {% endif %}
+                    {% empty %}
+                    <div style="color:var(--muted);font-size:12px;padding:4px 0">No items</div>
+                    {% endfor %}
+                </div>
+                {% empty %}
+                <div style="color:var(--muted);font-size:13px;padding:8px 0">No orders</div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- RIGHT — Sticky billing panel -->
+    <div class="sticky-panel">
+
+        <!-- Summary -->
+        <div class="card" style="margin-bottom:14px">
+            <div class="card-title" style="margin-bottom:12px">💰 Billing Summary</div>
+            <div class="summary-row">
+                <span class="summary-label">Subtotal</span>
+                <span id="sum-subtotal">₹{{ bill.subtotal|floatformat:2 }}</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">GST ({{ bill.tax_percentage }}%)</span>
+                <span id="sum-tax">₹{{ bill.tax_amount|floatformat:2 }}</span>
+            </div>
+            {% if bill.service_charge %}
+            <div class="summary-row">
+                <span class="summary-label">Service Charge</span>
+                <span>₹{{ bill.service_charge|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            {% if bill.discount_amount %}
+            <div class="summary-row">
+                <span class="summary-label">Discount ({{ bill.discount_reason|truncatechars:20 }})</span>
+                <span class="summary-discount" id="sum-discount">−₹{{ bill.discount_amount|floatformat:2 }}</span>
+            </div>
+            {% else %}
+            <div class="summary-row" id="discount-row" style="display:none">
+                <span class="summary-label">Discount</span>
+                <span class="summary-discount" id="sum-discount">−₹0.00</span>
+            </div>
+            {% endif %}
+            {% if bill.round_off %}
+            <div class="summary-row">
+                <span class="summary-label">Round Off</span>
+                <span id="sum-roundoff">{% if bill.round_off > 0 %}+{% endif %}₹{{ bill.round_off|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div class="summary-row grand">
+                <span>Grand Total</span>
+                <span id="sum-grand">₹{{ bill.grand_total|floatformat:2 }}</span>
+            </div>
+        </div>
+
+        {% if not bill.is_paid %}
+        <!-- Discount -->
+        <div class="card" style="margin-bottom:14px">
+            <div class="section-toggle" onclick="toggleSection(this)">
+                <span>🏷️ Discount</span>
+                <span class="arrow">▾</span>
+            </div>
+            <div class="section-body">
+                <div class="method-grid" id="discount-type-grid">
+                    <button class="method-btn {% if bill.discount_type == 'percent' %}selected{% endif %}" data-val="percent" onclick="selectDiscountType(this)">% Percentage</button>
+                    <button class="method-btn {% if bill.discount_type == 'flat' %}selected{% endif %}" data-val="flat" onclick="selectDiscountType(this)">₹ Flat Amount</button>
+                </div>
+                <input type="hidden" id="discount-type-val" value="{{ bill.discount_type }}">
+                <div class="form-group">
+                    <label class="form-label">Value</label>
+                    <input type="number" id="discount-value" class="form-control" min="0" step="0.01" value="{{ bill.discount_value }}" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reason <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="discount-reason" class="form-control" value="{{ bill.discount_reason }}" placeholder="e.g. Regular customer">
+                </div>
+                <button class="btn btn-primary btn-block" onclick="applyDiscount()">Apply Discount</button>
+                {% if bill.discount_amount %}
+                <button class="btn btn-ghost btn-block" style="margin-top:6px" onclick="removeDiscount()">Remove Discount</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Payments -->
+        <div class="card" style="margin-bottom:14px">
+            <div class="section-toggle" onclick="toggleSection(this)">
+                <span>💵 Record Payment</span>
+                <span class="arrow">▾</span>
+            </div>
+            <div class="section-body">
+                <div class="method-grid" id="payment-method-grid">
+                    {% for val, label in payment_methods %}
+                    <button class="method-btn" data-val="{{ val }}" onclick="selectMethod(this)">{{ label }}</button>
+                    {% endfor %}
+                </div>
+                <input type="hidden" id="payment-method-val" value="">
+                <div class="form-group">
+                    <label class="form-label">Amount (₹)</label>
+                    <input type="number" id="payment-amount" class="form-control" min="0.01" step="0.01" placeholder="0.00" id="pay-amount">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reference (optional)</label>
+                    <input type="text" id="payment-ref" class="form-control" placeholder="UPI ref / receipt no.">
+                </div>
+                <button class="btn btn-success btn-block" onclick="addPayment()">+ Add Payment</button>
+            </div>
+        </div>
+
+        <!-- Recorded payments -->
+        <div class="card" style="margin-bottom:14px" id="payments-panel">
+            <div style="font-size:13px;font-weight:700;margin-bottom:10px">Payments Recorded</div>
+            <div id="payments-list">
+            {% for pmt in payments %}
+            <div class="payment-tag" id="pmt-{{ pmt.id }}">
+                <span>{{ pmt.get_payment_method_display }}: <strong>₹{{ pmt.amount|floatformat:2 }}</strong>
+                {% if pmt.transaction_ref %}<span style="color:var(--muted);font-size:11px"> ({{ pmt.transaction_ref }})</span>{% endif %}
+                </span>
+                <button class="del-btn" onclick="deletePayment({{ pmt.id }})">✕</button>
+            </div>
+            {% endfor %}
+            </div>
+
+            <div class="amount-due-bar">
+                <div class="label">Amount Due</div>
+                <div class="value" id="amount-due" style="color:{% if bill.amount_due > 0 %}var(--danger){% else %}var(--success){% endif %}">
+                    ₹{{ bill.amount_due|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Close bill -->
+        <button class="btn btn-danger btn-block btn-lg" onclick="confirmClose()" id="close-btn">
+            ✓ Mark as Paid &amp; Close Table
+        </button>
+        {% endif %}
+    </div><!-- sticky-panel -->
+</div>
+
+<!-- Confirm Close Modal -->
+<div class="modal-bg" id="confirm-modal">
+    <div class="modal">
+        <div class="modal-title">Confirm Payment</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:20px">
+            This will close the table session and mark the bill as PAID.
+            Customers will no longer be able to place orders.
+        </p>
+        <div style="display:flex;gap:10px">
+            <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('confirm-modal').classList.remove('open')">Cancel</button>
+            <button class="btn btn-success" style="flex:1;font-size:15px;font-weight:700" onclick="doClose()">Confirm & Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const BILL_ID    = {{ bill.id }};
+const SESSION_ID = {{ ts.id }};
+const CSRF       = '{{ csrf_token }}';
+
+function toggleSection(el) {
+    el.classList.toggle('collapsed');
+    el.nextElementSibling.classList.toggle('hidden');
+}
+function selectDiscountType(btn) {
+    document.querySelectorAll('#discount-type-grid .method-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    document.getElementById('discount-type-val').value = btn.dataset.val;
+}
+function selectMethod(btn) {
+    document.querySelectorAll('#payment-method-grid .method-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    document.getElementById('payment-method-val').value = btn.dataset.val;
+}
+
+async function post(url, data) {
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', CSRF);
+    for (const [k, v] of Object.entries(data)) fd.append(k, v);
+    const r = await fetch(url, { method: 'POST', body: fd });
+    return r.json();
+}
+
+function updateDue(res) {
+    const el = document.getElementById('amount-due');
+    if (el && res.amount_due !== undefined) {
+        el.textContent = '₹' + parseFloat(res.amount_due).toFixed(2);
+        el.style.color = parseFloat(res.amount_due) > 0 ? 'var(--danger)' : 'var(--success)';
+    }
+}
+function updateSummary(res) {
+    if (res.grand_total) document.getElementById('sum-grand').textContent = '₹' + parseFloat(res.grand_total).toFixed(2);
+    if (res.tax_amount)  document.getElementById('sum-tax').textContent   = '₹' + parseFloat(res.tax_amount).toFixed(2);
+    if (res.discount_amount) {
+        const dr = document.getElementById('discount-row');
+        if (dr) dr.style.display = '';
+        const sd = document.getElementById('sum-discount');
+        if (sd) sd.textContent = '−₹' + parseFloat(res.discount_amount).toFixed(2);
+    }
+}
+
+async function recalcBill() {
+    const r = await post(`/billing/bills/${BILL_ID}/recalc/`, {});
+    if (r.status === 'ok') { showToast('Totals updated'); updateSummary(r); }
+    else showToast(r.message, 'error');
+}
+
+async function applyDiscount() {
+    const dtype   = document.getElementById('discount-type-val').value;
+    const dvalue  = document.getElementById('discount-value').value;
+    const dreason = document.getElementById('discount-reason').value.trim();
+    if (!dtype || !dvalue) return showToast('Select type and enter value', 'warning');
+    if (!dreason) return showToast('Discount reason is required', 'warning');
+    const r = await post(`/billing/bills/${BILL_ID}/discount/`, {
+        discount_type: dtype, discount_value: dvalue, discount_reason: dreason,
+    });
+    if (r.status === 'ok') { showToast('Discount applied'); updateSummary(r); }
+    else showToast(r.message, 'error');
+}
+
+async function removeDiscount() {
+    const r = await post(`/billing/bills/${BILL_ID}/discount/remove/`, {});
+    if (r.status === 'ok') { showToast('Discount removed'); updateSummary(r); }
+    else showToast(r.message, 'error');
+}
+
+async function addPayment() {
+    const method = document.getElementById('payment-method-val').value;
+    const amount = document.getElementById('payment-amount').value;
+    const ref    = document.getElementById('payment-ref').value;
+    if (!method) return showToast('Select a payment method', 'warning');
+    if (!amount || parseFloat(amount) <= 0) return showToast('Enter a valid amount', 'warning');
+    const r = await post(`/billing/bills/${BILL_ID}/payment/`, {
+        payment_method: method, amount: amount, transaction_ref: ref,
+    });
+    if (r.status === 'ok') {
+        showToast(`₹${parseFloat(r.amount).toFixed(2)} via ${r.method} recorded`);
+        // Add tag to list
+        const li = document.getElementById('payments-list');
+        const el = document.createElement('div');
+        el.id = `pmt-${r.payment_id}`;
+        el.className = 'payment-tag';
+        el.innerHTML = `<span>${r.method}: <strong>₹${parseFloat(r.amount).toFixed(2)}</strong></span>
+            <button class="del-btn" onclick="deletePayment(${r.payment_id})">✕</button>`;
+        li.appendChild(el);
+        updateDue(r);
+        document.getElementById('payment-amount').value = '';
+        document.getElementById('payment-ref').value    = '';
+    } else showToast(r.message, 'error');
+}
+
+async function deletePayment(pid) {
+    const r = await post(`/billing/bills/${BILL_ID}/payment/${pid}/delete/`, {});
+    if (r.status === 'ok') {
+        document.getElementById(`pmt-${pid}`)?.remove();
+        updateDue(r);
+        showToast('Payment removed');
+    } else showToast(r.message, 'error');
+}
+
+function confirmClose() {
+    document.getElementById('confirm-modal').classList.add('open');
+}
+
+async function doClose() {
+    document.getElementById('confirm-modal').classList.remove('open');
+    const r = await post(`/billing/bills/${BILL_ID}/close/`, {});
+    if (r.status === 'ok') {
+        showToast(`Bill ${r.bill_number} marked as PAID ✓`, 'success');
+        setTimeout(() => location.href = '/billing/open/', 1500);
+    } else showToast(r.message, 'error');
+}
+
+document.getElementById('confirm-modal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+});
+</script>
+{% endblock %}

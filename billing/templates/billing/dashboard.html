@@ -1,0 +1,132 @@
+{% extends "billing/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<!-- KPI row -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-icon">₹</div>
+        <div class="kpi-value" style="color:#22c55e">₹{{ stats.today_revenue|floatformat:0 }}</div>
+        <div class="kpi-label">Today's Revenue</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon">🧾</div>
+        <div class="kpi-value">{{ stats.today_bills }}</div>
+        <div class="kpi-label">Bills Closed Today</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon">📝</div>
+        <div class="kpi-value" style="color:#f59e0b">{{ stats.open_bills }}</div>
+        <div class="kpi-label">Open Bills</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon">🍽️</div>
+        <div class="kpi-value" style="color:#6366f1">{{ stats.tables_occupied }}</div>
+        <div class="kpi-label">Tables Occupied</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon">⏳</div>
+        <div class="kpi-value" style="color:#ef4444">{{ stats.waiting_payment }}</div>
+        <div class="kpi-label">Waiting for Payment</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon">👥</div>
+        <div class="kpi-value">{{ stats.customers_served }}</div>
+        <div class="kpi-label">Customers Served</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon">📊</div>
+        <div class="kpi-value">₹{{ stats.avg_bill_value|floatformat:0 }}</div>
+        <div class="kpi-label">Avg Bill Value</div>
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+
+    <!-- Bill Requests -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">🔔 Bill Requests</div>
+            <a href="{% url 'billing:open_bills' %}" class="btn btn-ghost btn-sm">View All</a>
+        </div>
+        {% if bill_requests %}
+        <table class="data-table">
+            <thead>
+                <tr><th>Table</th><th>Requested</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+            {% for ts in bill_requests %}
+            <tr>
+                <td><strong>Table {{ ts.table.table_number }}</strong></td>
+                <td style="color:var(--warning)">{{ ts.bill_requested_at|timesince }} ago</td>
+                <td>
+                    <a href="{% url 'billing:bill_detail' ts.id %}" class="btn btn-warning btn-sm">Open Bill</a>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">
+            No pending bill requests
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Recent Bills -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">✅ Recent Bills Today</div>
+            <a href="{% url 'billing:history' %}" class="btn btn-ghost btn-sm">History</a>
+        </div>
+        {% if recent_bills %}
+        <table class="data-table">
+            <thead>
+                <tr><th>Bill #</th><th>Table</th><th>Total</th><th>Time</th></tr>
+            </thead>
+            <tbody>
+            {% for bill in recent_bills %}
+            <tr>
+                <td style="font-family:monospace;font-size:11px">{{ bill.bill_number }}</td>
+                <td>Table {{ bill.table_session.table_number }}</td>
+                <td style="color:var(--success);font-weight:700">₹{{ bill.grand_total|floatformat:0 }}</td>
+                <td style="color:var(--muted)">{{ bill.paid_at|time:"H:i" }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">
+            No bills closed today yet
+        </p>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+// Live refresh KPI stats every 30 seconds
+function onWsMessage(data) {
+    if (['bill_requested','table_closed','new_order'].includes(data.type)) {
+        refreshKPIs();
+    }
+}
+
+function refreshKPIs() {
+    fetch(location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc    = parser.parseFromString(html, 'text/html');
+            const newKPI = doc.querySelector('.kpi-grid');
+            if (newKPI) document.querySelector('.kpi-grid').replaceWith(newKPI);
+        })
+        .catch(() => {});
+}
+
+setInterval(refreshKPIs, 30000);
+</script>
+{% endblock %}

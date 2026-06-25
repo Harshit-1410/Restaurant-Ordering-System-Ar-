@@ -17,6 +17,7 @@ urlpatterns = [
     path('', home),
     path('', include('restaurants.urls')),
     path('ordering/', include('ordering.urls')),
+    path('billing/', include('billing.urls')),
 
     # Media files (food images, AR models) are committed to git and always
     # present on Railway — serve them directly in production too.

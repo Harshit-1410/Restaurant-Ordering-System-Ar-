@@ -1,0 +1,125 @@
+{% extends "billing/base.html" %}
+
+{% block title %}Open Tables{% endblock %}
+{% block page_title %}Open Tables{% endblock %}
+{% block nav_open %}active{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .tables-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 16px; }
+    .table-card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 12px; overflow: hidden;
+        transition: border-color .2s;
+    }
+    .table-card:hover { border-color: #6366f1; }
+    .table-card.green  { border-top: 3px solid var(--success); }
+    .table-card.orange { border-top: 3px solid var(--warning); }
+    .table-card.red    { border-top: 3px solid var(--danger); }
+    .tc-header {
+        padding: 14px 16px 10px;
+        display: flex; align-items: center; justify-content: space-between;
+    }
+    .tc-number { font-size: 18px; font-weight: 800; }
+    .tc-body { padding: 0 16px 14px; }
+    .tc-stat {
+        display: flex; align-items: center; justify-content: space-between;
+        font-size: 12px; color: var(--muted); padding: 3px 0;
+    }
+    .tc-stat .val { color: var(--text); font-weight: 600; }
+    .tc-total {
+        font-size: 22px; font-weight: 800; color: var(--text);
+        margin: 10px 0 12px;
+    }
+    .tc-actions { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-state h2 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<button onclick="location.reload()" class="btn btn-ghost btn-sm">↺ Refresh</button>
+{% endblock %}
+
+{% block content %}
+{% if rows %}
+<div class="tables-grid" id="tables-grid">
+{% for row in rows %}
+{% with elapsed=row.elapsed_secs %}
+{% comment %}Color: green <30min, orange 30-60min, red >60min. Waiting overrides.{% endcomment %}
+{% if row.bill_requested %}
+    {% with color="orange" %}
+<div class="table-card {{ color }}" id="session-card-{{ row.session.id }}">
+    {% endwith %}
+{% elif elapsed > 3600 %}
+<div class="table-card red" id="session-card-{{ row.session.id }}">
+{% elif elapsed > 1800 %}
+<div class="table-card orange" id="session-card-{{ row.session.id }}">
+{% else %}
+<div class="table-card green" id="session-card-{{ row.session.id }}">
+{% endif %}
+    <div class="tc-header">
+        <div class="tc-number">Table {{ row.session.table.table_number }}</div>
+        <div>
+            {% if row.bill_requested %}
+                <span class="badge badge-waiting">Bill Requested</span>
+            {% else %}
+                <span class="badge badge-open">Open</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="tc-body">
+        <div class="tc-stat">
+            <span>Opened</span>
+            <span class="val">{{ row.session.started_at|time:"H:i" }}</span>
+        </div>
+        <div class="tc-stat">
+            <span>Elapsed</span>
+            <span class="val">{{ row.elapsed }}</span>
+        </div>
+        <div class="tc-stat">
+            <span>Guests</span>
+            <span class="val">{{ row.customer_count }}</span>
+        </div>
+        <div class="tc-stat">
+            <span>Orders Total</span>
+            <span class="val">₹{{ row.order_total|floatformat:0 }}</span>
+        </div>
+        {% if row.bill %}
+        <div class="tc-stat">
+            <span>Bill Status</span>
+            <span class="val">
+                <span class="badge badge-{{ row.bill.status }}">{{ row.bill.get_status_display }}</span>
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    <div class="tc-actions">
+        <a href="{% url 'billing:bill_detail' row.session.id %}" class="btn btn-primary btn-sm" style="flex:1;justify-content:center">
+            💳 View Bill
+        </a>
+        {% if row.bill %}
+        <a href="{% url 'billing:receipt' row.bill.id %}" class="btn btn-ghost btn-sm" target="_blank" title="Print Receipt">🖨️</a>
+        {% endif %}
+    </div>
+</div>
+{% endwith %}
+{% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div style="font-size:52px;margin-bottom:12px">🍽️</div>
+    <h2>No active tables</h2>
+    <p>All tables are currently closed or empty.</p>
+</div>
+{% endif %}
+
+<script>
+function onWsMessage(data) {
+    if (['bill_requested', 'new_order', 'table_closed'].includes(data.type)) {
+        setTimeout(() => location.reload(), 800);
+    }
+}
+</script>
+{% endblock %}

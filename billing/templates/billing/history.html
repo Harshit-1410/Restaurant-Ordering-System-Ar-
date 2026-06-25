@@ -1,0 +1,169 @@
+{% extends "billing/base.html" %}
+
+{% block title %}Bill History{% endblock %}
+{% block page_title %}Bill History{% endblock %}
+{% block nav_history %}active{% endblock %}
+
+{% block extra_styles %}
+<style>
+.filter-bar {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+    margin-bottom: 20px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+}
+.filter-bar .form-group { margin: 0; }
+.filter-bar .form-control { padding: 7px 11px; font-size: 12px; }
+.date-tabs { display: flex; gap: 4px; }
+.date-tab {
+    padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer; background: none; border: 1px solid var(--border); color: var(--muted);
+    transition: all .15s;
+}
+.date-tab.active,
+.date-tab:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.search-box {
+    flex: 1; min-width: 180px;
+    display: flex; gap: 6px; align-items: center;
+}
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'billing:open_bills' %}" class="btn btn-ghost btn-sm">← Open Tables</a>
+{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<form method="get" class="filter-bar" id="filter-form">
+    <!-- Date tabs -->
+    <div>
+        <div class="form-label">Period</div>
+        <div class="date-tabs">
+            {% for val, label in date_tabs %}
+            <button type="button" class="date-tab {% if date_filter == val %}active{% endif %}"
+                onclick="setDate('{{ val }}')">{{ label }}</button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Custom date range (shown when date_filter == 'custom') -->
+    <div id="custom-dates" style="display:{% if date_filter == 'custom' %}flex{% else %}none{% endif %};gap:8px;align-items:flex-end">
+        <div class="form-group">
+            <label class="form-label">From</label>
+            <input type="date" name="from" class="form-control" value="{{ from_date }}">
+        </div>
+        <div class="form-group">
+            <label class="form-label">To</label>
+            <input type="date" name="to" class="form-control" value="{{ to_date }}">
+        </div>
+    </div>
+
+    <!-- Method filter -->
+    <div class="form-group">
+        <label class="form-label">Payment Method</label>
+        <select name="method" class="form-control" onchange="this.form.submit()">
+            <option value="">All Methods</option>
+            {% for val, label in payment_methods %}
+            <option value="{{ val }}" {% if method_filter == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Table filter -->
+    <div class="form-group">
+        <label class="form-label">Table</label>
+        <input type="text" name="table" class="form-control" placeholder="e.g. 5" value="{{ table_filter }}" style="width:80px">
+    </div>
+
+    <!-- Search -->
+    <div class="search-box">
+        <input type="text" name="q" class="form-control" placeholder="Search bill number…" value="{{ search }}">
+        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+        {% if search or method_filter or table_filter %}
+        <a href="?date={{ date_filter }}" class="btn btn-ghost btn-sm">✕ Clear</a>
+        {% endif %}
+    </div>
+
+    <input type="hidden" name="date" id="date-input" value="{{ date_filter }}">
+</form>
+
+<!-- Table -->
+{% if bills %}
+<div class="card" style="padding:0;overflow:hidden">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Bill #</th>
+                <th>Date</th>
+                <th>Table</th>
+                <th>Cashier</th>
+                <th>Guests</th>
+                <th>Subtotal</th>
+                <th>Discount</th>
+                <th>GST</th>
+                <th>Grand Total</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for bill in bills %}
+        <tr>
+            <td style="font-family:monospace;font-size:11px;white-space:nowrap">{{ bill.bill_number }}</td>
+            <td style="white-space:nowrap">
+                {{ bill.created_at|date:"d M Y" }}<br>
+                <span style="font-size:11px;color:var(--muted)">{{ bill.created_at|time:"H:i" }}</span>
+            </td>
+            <td>Table {{ bill.table_session.table_number }}</td>
+            <td>{{ bill.cashier.get_full_name|default:bill.cashier.username }}</td>
+            <td style="text-align:center">{{ bill.customer_count }}</td>
+            <td>₹{{ bill.subtotal|floatformat:0 }}</td>
+            <td style="color:var(--success)">
+                {% if bill.discount_amount %}−₹{{ bill.discount_amount|floatformat:0 }}{% else %}—{% endif %}
+            </td>
+            <td>₹{{ bill.tax_amount|floatformat:0 }}</td>
+            <td style="font-weight:700;color:{% if bill.is_paid %}var(--success){% else %}var(--warning){% endif %}">
+                ₹{{ bill.grand_total|floatformat:0 }}
+            </td>
+            <td><span class="badge badge-{{ bill.status }}">{{ bill.get_status_display }}</span></td>
+            <td style="font-size:11px;color:var(--muted)">
+                {% for pmt in bill.payments.all %}
+                {{ pmt.get_payment_method_display }}<br>
+                {% endfor %}
+            </td>
+            <td>
+                {% if bill.is_paid %}
+                <a href="{% url 'billing:receipt' bill.id %}" class="btn btn-ghost btn-sm" target="_blank">🖨️</a>
+                {% else %}
+                <a href="{% url 'billing:bill_detail' bill.table_session.id %}" class="btn btn-warning btn-sm">View</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:60px 20px;color:var(--muted)">
+    <div style="font-size:40px;margin-bottom:10px">📋</div>
+    <div style="font-size:15px;color:var(--text);margin-bottom:6px">No bills found</div>
+    <div style="font-size:13px">Try adjusting the filters</div>
+</div>
+{% endif %}
+
+<script>
+// Provide date_tabs as a template tag shortcut workaround
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function setDate(val) {
+    document.getElementById('date-input').value = val;
+    document.getElementById('custom-dates').style.display = val === 'custom' ? 'flex' : 'none';
+    if (val !== 'custom') document.getElementById('filter-form').submit();
+}
+</script>
+{% endblock %}
