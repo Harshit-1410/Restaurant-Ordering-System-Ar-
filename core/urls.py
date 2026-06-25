@@ -13,11 +13,11 @@ def home(request):
     return redirect('/admin/')
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', home),
-    path('', include('restaurants.urls')),
+    path('admin/',    admin.site.urls),
     path('ordering/', include('ordering.urls')),
-    path('billing/', include('billing.urls')),
+    path('billing/',  include('billing.urls')),   # must come before restaurants catch-all
+    path('',          home),
+    path('',          include('restaurants.urls')),
 
     # Media files (food images, AR models) are committed to git and always
     # present on Railway — serve them directly in production too.
