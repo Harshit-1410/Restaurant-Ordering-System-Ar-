@@ -18,6 +18,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
+from django.db.models import Avg, Sum
 from django.utils import timezone
 
 from ordering.models import Order, TableSession
@@ -40,7 +41,7 @@ def calculate_totals(bill: Bill) -> dict:
         Order.objects
         .filter(customer_session__table_session=ts)
         .exclude(status='cancelled')
-        .aggregate(total=__import__('django.db.models', fromlist=['Sum']).Sum('total_amount'))
+        .aggregate(total=Sum('total_amount'))
     )['total'] or Decimal('0')
 
     # ── Discount ──
@@ -212,9 +213,6 @@ def close_bill(bill: Bill) -> Bill:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def today_stats(restaurant) -> dict:
-    from django.db.models import Sum, Count, Avg
-    from django.utils import timezone
-
     today = timezone.localdate()
     paid_today = Bill.objects.filter(
         restaurant=restaurant, status=Bill.STATUS_PAID, paid_at__date=today
@@ -247,8 +245,6 @@ def today_stats(restaurant) -> dict:
 
 def revenue_last_n_days(restaurant, n: int = 7) -> list:
     """Returns list of (date_str, revenue) for charting."""
-    from django.db.models import Sum
-    from django.utils import timezone
     import datetime
 
     today = timezone.localdate()
@@ -265,8 +261,6 @@ def revenue_last_n_days(restaurant, n: int = 7) -> list:
 
 
 def payment_method_breakdown(restaurant, period_days: int = 30) -> dict:
-    from django.db.models import Sum
-    from django.utils import timezone
     import datetime
 
     since = timezone.now() - datetime.timedelta(days=period_days)
@@ -285,12 +279,10 @@ def payment_method_breakdown(restaurant, period_days: int = 30) -> dict:
 
 
 def top_items(restaurant, limit: int = 10, period_days: int = 30) -> list:
-    from django.db.models import Sum
-    from django.utils import timezone
     import datetime
+    from ordering.models import OrderItem
 
     since = timezone.now() - datetime.timedelta(days=period_days)
-    from ordering.models import OrderItem
     qs = (
         OrderItem.objects
         .filter(
