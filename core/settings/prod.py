@@ -7,8 +7,10 @@ Required Railway environment variables:
   ALLOWED_HOSTS           = yourdomain.up.railway.app
   DATABASE_URL            = <auto-injected by Railway PostgreSQL plugin>
   REDIS_URL               = <auto-injected by Railway Redis plugin>
+  CLOUDINARY_URL          = cloudinary://api_key:api_secret@cloud_name
 """
 
+import cloudinary
 import dj_database_url
 from decouple import Csv, config
 
@@ -37,6 +39,14 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Cloudinary — persistent media storage for AR models and food images.
+# dev.py uses local MEDIA_ROOT; prod uses Cloudinary so files survive redeploys.
+INSTALLED_APPS = INSTALLED_APPS + ['cloudinary_storage', 'cloudinary']  # noqa: F405
+
+cloudinary.config(cloudinary_url=config('CLOUDINARY_URL'))
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # Railway terminates SSL at the load balancer and forwards HTTP internally.
 # SECURE_SSL_REDIRECT must be False or Railway's health checker gets redirect-looped.
