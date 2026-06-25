@@ -11,6 +11,7 @@ Required Railway environment variables:
 """
 
 import os as _os
+from urllib.parse import urlparse as _urlparse
 
 import dj_database_url
 from decouple import Csv, config
@@ -44,19 +45,37 @@ CHANNEL_LAYERS = {
 # Cloudinary — persistent media storage for AR models and food images.
 # dev.py uses local MEDIA_ROOT; prod uses Cloudinary so files survive redeploys.
 # CLOUDINARY_URL is optional: if not set, media falls back to local MEDIA_ROOT.
+#
+# django-cloudinary-storage reads credentials from settings.CLOUDINARY_STORAGE,
+# NOT from os.environ directly.  We parse CLOUDINARY_URL ourselves and populate
+# that dict so set_credentials() in app_settings.py works correctly.
 _cloudinary_url = config('CLOUDINARY_URL', default='')
 
 if _cloudinary_url:
-    # Pop from os.environ BEFORE importing cloudinary — the library auto-parses
-    # CLOUDINARY_URL at module load time and raises ValueError for any invalid format.
-    # We clear it here and configure explicitly so we control the error surface.
-    _os.environ.pop('CLOUDINARY_URL', None)
+    try:
+        # Parse cloudinary://api_key:api_secret@cloud_name
+        _parsed = _urlparse(_cloudinary_url)
+        _cloud_name = _parsed.hostname      # e.g. 'mycloudname'
+        _api_key    = _parsed.username
+        _api_secret = _parsed.password
 
-    import cloudinary  # noqa: PLC0415
+        if _cloud_name and _api_key and _api_secret:
+            # Pop from os.environ so the cloudinary package does not try to
+            # auto-parse it at import time (raises ValueError for bad formats).
+            _os.environ.pop('CLOUDINARY_URL', None)
 
-    INSTALLED_APPS = INSTALLED_APPS + ['cloudinary_storage', 'cloudinary']  # noqa: F405
-    cloudinary.config(cloudinary_url=_cloudinary_url)
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+            INSTALLED_APPS = INSTALLED_APPS + ['cloudinary_storage', 'cloudinary']  # noqa: F405
+
+            # django-cloudinary-storage's set_credentials() reads this dict.
+            CLOUDINARY_STORAGE = {  # noqa: F405
+                'CLOUD_NAME': _cloud_name,
+                'API_KEY':    _api_key,
+                'API_SECRET': _api_secret,
+            }
+
+            DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    except Exception:
+        pass  # Malformed CLOUDINARY_URL — fall back to local (ephemeral) storage
 
 # Railway terminates SSL at the load balancer and forwards HTTP internally.
 # SECURE_SSL_REDIRECT must be False or Railway's health checker gets redirect-looped.
