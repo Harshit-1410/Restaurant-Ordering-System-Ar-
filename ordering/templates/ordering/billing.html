@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Billing Dashboard — {{ restaurant.name }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #111; color: #fff; min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: #1a1a1a; padding: 16px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 100;
+        }
+        .header h1 { font-size: 18px; font-weight: 700; color: #fff; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .header-nav { color: #888; text-decoration: none; font-size: 13px; font-weight: 700; margin-right: 16px; transition: color 0.2s; }
+        .header-nav:hover { color: #fff; }
+        .ws-status { width: 10px; height: 10px; border-radius: 50%; background: #e74c3c; }
+        .ws-status.connected { background: #2ecc71; }
+        .ws-label { font-size: 12px; color: #888; }
+
+        /* ── Grid ── */
+        .dashboard-container { padding: 24px; max-width: 1200px; margin: 0 auto; }
+        .section-title { font-size: 14px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+        /* ── Cards ── */
+        .table-card {
+            background: #1a1a1a; border: 1px solid #333; border-radius: 12px;
+            padding: 16px; display: flex; flex-direction: column; gap: 12px;
+            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+        .table-card.requested {
+            border-color: #f39c12; background: #1c150b;
+            box-shadow: 0 4px 16px rgba(243, 156, 18, 0.15);
+        }
+        .table-card.new-flash { animation: flash-card 0.8s ease 3; }
+        @keyframes flash-card { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .table-number { font-size: 20px; font-weight: 800; color: #fff; }
+        .bill-badge { font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #333; color: #aaa; }
+        .table-card.requested .bill-badge { background: #f39c12; color: #000; }
+
+        .card-body { flex: 1; }
+        .card-stat { display: flex; justify-content: space-between; font-size: 13px; color: #ccc; margin-bottom: 6px; }
+        .card-stat span:last-child { font-weight: 700; color: #fff; }
+        .card-stat.total { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #333; font-size: 15px; }
+        .card-stat.total span:last-child { color: #2ecc71; font-size: 18px; }
+
+        .btn-view {
+            width: 100%; padding: 10px; border-radius: 8px; border: none;
+            background: #333; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.2s;
+        }
+        .btn-view:hover { background: #444; }
+        .table-card.requested .btn-view { background: #f39c12; color: #000; }
+        .table-card.requested .btn-view:hover { background: #e67e22; }
+
+        .no-data { text-align: center; color: #666; padding: 40px; font-size: 14px; }
+
+        /* ── Modal ── */
+        .modal-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+            z-index: 500; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .modal-backdrop.open { opacity: 1; pointer-events: all; }
+        .modal {
+            background: #1a1a1a; width: 100%; max-width: 400px; border-radius: 16px;
+            overflow: hidden; border: 1px solid #333; transform: scale(0.95); transition: transform 0.2s;
+        }
+        .modal-backdrop.open .modal { transform: scale(1); }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { font-size: 16px; font-weight: 700; }
+        .modal-close { background: none; border: none; color: #888; font-size: 20px; cursor: pointer; }
+        .modal-close:hover { color: #fff; }
+        
+        .modal-body { padding: 20px; max-height: 60vh; overflow-y: auto; }
+        .receipt-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #ccc; }
+        .receipt-qty { color: #888; display: inline-block; width: 24px; }
+        .receipt-price { font-weight: 700; color: #fff; }
+        .receipt-total { display: flex; justify-content: space-between; margin-top: 16px; padding-top: 16px; border-top: 1px dashed #444; font-size: 18px; font-weight: 800; }
+        .receipt-total span:last-child { color: #2ecc71; }
+
+        .modal-footer { padding: 16px 20px; background: #111; border-top: 1px solid #333; }
+        .btn-close-table {
+            width: 100%; padding: 14px; border-radius: 10px; border: none;
+            background: #2ecc71; color: #000; font-size: 15px; font-weight: 800; cursor: pointer; transition: opacity 0.2s;
+        }
+        .btn-close-table:hover { opacity: 0.9; }
+
+        .toast {
+            position: fixed; top: 70px; right: 20px; background: #2ecc71; color: #fff;
+            padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+            display: none; z-index: 999;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>{{ restaurant.name }} — Billing</h1>
+        <div class="header-right">
+            <a href="{% url 'ordering:kitchen' restaurant.id %}" class="header-nav">&larr; Kitchen Dashboard</a>
+            <span class="ws-label" id="ws-label">Connecting...</span>
+            <div class="ws-status" id="ws-status"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="dashboard-container">
+        <div class="section-title">Active Tables (<span id="active-count">{{ sessions|length }}</span>)</div>
+        <div class="grid" id="tables-grid">
+            {% for session in sessions %}
+            <div class="table-card {% if session.bill_requested_at %}requested{% endif %}" id="card-{{ session.id }}" data-total="{{ session.session_total }}">
+                <div class="card-header">
+                    <div class="table-number">Table {{ session.table_number }}</div>
+                    <div class="bill-badge">{% if session.bill_requested_at %}Bill Requested{% else %}Dining{% endif %}</div>
+                </div>
+                <div class="card-body">
+                    <div class="card-stat">
+                        <span>Orders</span>
+                        <span id="orders-{{ session.id }}">{{ session.order_set.count }}</span>
+                    </div>
+                    <div class="card-stat total">
+                        <span>Total Bill</span>
+                        <span id="total-{{ session.id }}">₹{{ session.session_total }}</span>
+                    </div>
+                </div>
+                <button class="btn-view" onclick="openBillModal({{ session.id }})">View Bill</button>
+            </div>
+            {% empty %}
+            <div class="no-data" id="no-data">No active tables at the moment.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-backdrop" id="modal-backdrop" onclick="if(event.target===this) closeBillModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modal-title">Table — Bill</h2>
+                <button class="modal-close" onclick="closeBillModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="receipt-items">Loading...</div>
+                <div class="receipt-total">
+                    <span>Total</span>
+                    <span id="modal-total">₹0.00</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close-table" id="btn-close-table">Mark as Paid & Close Table</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const RESTAURANT_ID = {{ restaurant.id }};
+        let currentSessionId = null;
+
+        function getCookie(name) {
+            let v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+            return v ? v[2] : null;
+        }
+
+        function showToast(msg, color = '#2ecc71') {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.style.background = color; t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+
+        /* ─── Modal Logic ─── */
+        function openBillModal(sessionId) {
+            currentSessionId = sessionId;
+            document.getElementById('receipt-items').innerHTML = '<div style="color:#888; text-align:center;">Loading receipt...</div>';
+            document.getElementById('modal-total').textContent = '₹...';
+            document.getElementById('modal-title').textContent = 'Loading...';
+            document.getElementById('modal-backdrop').classList.add('open');
+
+            fetch(`/ordering/billing/detail/${sessionId}/`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('modal-title').textContent = `Table ${data.table_number} — Bill`;
+                    document.getElementById('modal-total').textContent = `₹${data.total_amount}`;
+                    
+                    let html = '';
+                    if (data.items.length === 0) {
+                        html = '<div style="color:#888;">No items ordered yet.</div>';
+                    } else {
+                        data.items.forEach(item => {
+                            html += `
+                            <div class="receipt-item">
+                                <span><span class="receipt-qty">${item.quantity}×</span> ${item.name}</span>
+                                <span class="receipt-price">₹${item.subtotal}</span>
+                            </div>`;
+                        });
+                    }
+                    document.getElementById('receipt-items').innerHTML = html;
+                })
+                .catch(() => {
+                    document.getElementById('receipt-items').innerHTML = '<div style="color:#e74c3c;">Failed to load receipt.</div>';
+                });
+        }
+
+        function closeBillModal() {
+            document.getElementById('modal-backdrop').classList.remove('open');
+            currentSessionId = null;
+        }
+
+        document.getElementById('btn-close-table').addEventListener('click', () => {
+            if (!currentSessionId) return;
+            const btn = document.getElementById('btn-close-table');
+            const originalText = btn.textContent;
+            btn.textContent = 'Processing...';
+            btn.disabled = true;
+
+            fetch(`/ordering/billing/close/${currentSessionId}/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    showToast('Table closed successfully!');
+                    closeBillModal();
+                    // card removal is handled by WebSocket 'table_closed' event
+                }
+            })
+            .finally(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            });
+        });
+
+        /* ─── WebSocket Logic ─── */
+        const wsUrl = `ws://${window.location.host}/ws/kitchen/${RESTAURANT_ID}/`;
+        let ws;
+        let reconnectDelay = 1000;
+        const maxReconnectDelay = 30000;
+        let reconnectTimer = null;
+
+        function connectWS() {
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                reconnectDelay = 1000; // reset delay
+                const statusCircle = document.getElementById('ws-status');
+                const label = document.getElementById('ws-label');
+                if (statusCircle) statusCircle.classList.add('connected');
+                if (label) label.textContent = 'Live';
+            };
+
+            ws.onclose = () => {
+                const statusCircle = document.getElementById('ws-status');
+                const label = document.getElementById('ws-label');
+                if (statusCircle) statusCircle.classList.remove('connected');
+                if (label) label.textContent = 'Reconnecting...';
+
+                reconnectTimer = setTimeout(() => {
+                    connectWS();
+                }, reconnectDelay);
+
+                // exponential backoff
+                reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+            };
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+
+                if (data.type === 'bill_requested') {
+                    const card = document.getElementById(`card-${data.session_id}`);
+                    if (card) {
+                        card.classList.add('requested');
+                        card.classList.add('new-flash');
+                        const badge = card.querySelector('.bill-badge');
+                        if(badge) badge.textContent = 'Bill Requested';
+                        
+                        // play beep
+                        try {
+                            const ctx = new AudioContext();
+                            const o = ctx.createOscillator();
+                            const g = ctx.createGain();
+                            o.connect(g); g.connect(ctx.destination);
+                            o.frequency.value = 600;
+                            g.gain.setValueAtTime(0.3, ctx.currentTime);
+                            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                            o.start(); o.stop(ctx.currentTime + 0.3);
+                        } catch (e) { }
+                    }
+                }
+
+                if (data.type === 'new_order') {
+                    // For billing, we just want to know a table ordered something so we might need to refresh
+                    // Or simply reload the page to get the new table/session_total if we don't do complex client updates
+                    // A simple solution: just reload the page since FOH isn't actively interacting like kitchen
+                    // But to avoid interrupting, we can just fetch the new total for that session.
+                    setTimeout(() => location.reload(), 500);
+                }
+
+                if (data.type === 'table_closed') {
+                    const card = document.getElementById(`card-${data.session_id}`);
+                    if (card) {
+                        card.remove();
+                        const grid = document.getElementById('tables-grid');
+                        if (grid.querySelectorAll('.table-card').length === 0) {
+                            if (!document.getElementById('no-data')) {
+                                grid.innerHTML = '<div class="no-data" id="no-data">No active tables at the moment.</div>';
+                            }
+                        }
+                        updateCount();
+                    }
+                }
+            };
+        }
+
+        function updateCount() {
+            const count = document.querySelectorAll('.table-card').length;
+            document.getElementById('active-count').textContent = count;
+        }
+
+        connectWS();
+    </script>
+</body>
+
+</html>

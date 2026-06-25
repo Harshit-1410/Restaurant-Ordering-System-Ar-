@@ -1,0 +1,26 @@
+<div class="order-card" id="order-{{ order.id }}">
+    <div class="card-header">
+        <span class="order-id">#{{ order.id }}</span>
+        <span class="table-badge">Table {{ order.table_session.table_number }}</span>
+    </div>
+    <div class="order-time">{{ order.created_at|time:"H:i" }}</div>
+    <div class="item-list">
+        {% for item in order.items.all %}
+        <div class="item-row">
+            <span><span class="item-qty">{{ item.quantity }}×</span> {{ item.menu_item.name }}</span>
+            {% if item.notes %}<span style="color:#666;font-size:11px">{{ item.notes }}</span>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    <div class="card-actions">
+        {% if order.status == 'pending' %}
+        <button class="btn-status btn-preparing" onclick="updateStatus({{ order.id }},'preparing')">Start
+            Preparing</button>
+        <button class="btn-status btn-cancel" onclick="updateStatus({{ order.id }},'cancelled')">Cancel</button>
+        {% elif order.status == 'preparing' %}
+        <button class="btn-status btn-ready" onclick="updateStatus({{ order.id }},'ready')">Mark Ready</button>
+        {% elif order.status == 'ready' %}
+        <button class="btn-status btn-served" onclick="updateStatus({{ order.id }},'served')">Mark Served</button>
+        {% endif %}
+    </div>
+</div>

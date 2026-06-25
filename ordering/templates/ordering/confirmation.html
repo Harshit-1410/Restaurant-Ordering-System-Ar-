@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Order Placed!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            max-width: 360px;
+            width: 100%;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .check {
+            font-size: 56px;
+            margin-bottom: 16px;
+            transition: transform 0.3s ease;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        p {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .order-num {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .order-num strong {
+            display: block;
+            font-size: 24px;
+            color: #1a1a1a;
+            margin-top: 4px;
+            font-weight: 700;
+        }
+
+        .items {
+            text-align: left;
+            margin-bottom: 24px;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .item-row:last-child {
+            border: none;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+            font-size: 16px;
+            padding-top: 12px;
+            border-top: 2px solid #1a1a1a;
+            margin-top: 4px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            border-radius: 20px;
+            padding: 6px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            transition: background 0.4s ease, color 0.4s ease;
+        }
+
+        .status-badge.pending    { background: #fff3cd; color: #856404; }
+        .status-badge.preparing  { background: #cfe2ff; color: #084298; }
+        .status-badge.ready      { background: #d1e7dd; color: #0a3622; }
+        .status-badge.served     { background: #d3d3d3; color: #333;    }
+
+        .ws-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+            margin-right: 4px;
+            vertical-align: middle;
+            transition: background 0.3s;
+        }
+
+        .ws-dot.connected { background: #2ecc71; }
+
+        .back-btn {
+            display: block;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <div class="check" id="status-icon">✅</div>
+        <h1>Order Placed!</h1>
+        <p>Your order has been sent to the kitchen.<br>We'll have it ready shortly.</p>
+
+        <div class="order-num">
+            Order number
+            <strong>#{{ order.id }}</strong>
+        </div>
+
+        <div id="status-badge" class="status-badge {{ order.status }}">
+            <span class="ws-dot" id="ws-dot"></span>
+            <span id="status-text">{{ order.get_status_display }}</span>
+        </div>
+
+        <div class="items">
+            {% for item in order.items.all %}
+            <div class="item-row">
+                <span>{{ item.quantity }}× {{ item.menu_item.name }}</span>
+                <span>₹{{ item.subtotal }}</span>
+            </div>
+            {% endfor %}
+            <div class="total-row">
+                <span>Total</span>
+                <span>₹{{ order.total_amount }}</span>
+            </div>
+        </div>
+
+        <a class="back-btn" href="/">Order more</a>
+    </div>
+
+    <script>
+        const ORDER_ID = {{ order.id }};
+
+        const STATUS_META = {
+            pending:   { icon: '✅', label: 'Order Placed – Waiting...' },
+            preparing: { icon: '👨‍🍳', label: 'Preparing your order' },
+            ready:     { icon: '🔔', label: 'Ready for pickup!' },
+            served:    { icon: '🍽️', label: 'Served – Enjoy!' },
+        };
+
+        function applyStatus(status) {
+            const badge  = document.getElementById('status-badge');
+            const text   = document.getElementById('status-text');
+            const icon   = document.getElementById('status-icon');
+            const meta   = STATUS_META[status] || { icon: '✅', label: status };
+
+            // swap classes
+            badge.className = 'status-badge ' + status;
+            text.textContent = meta.label;
+            icon.textContent = meta.icon;
+
+            // brief pop animation
+            icon.style.transform = 'scale(1.3)';
+            setTimeout(() => icon.style.transform = 'scale(1)', 300);
+        }
+
+        function connectWS() {
+            const ws   = new WebSocket(`ws://${location.host}/ws/order/${ORDER_ID}/`);
+            const dot  = document.getElementById('ws-dot');
+
+            ws.onopen  = () => dot.classList.add('connected');
+            ws.onclose = () => {
+                dot.classList.remove('connected');
+                setTimeout(connectWS, 3000);   // auto-reconnect
+            };
+            ws.onerror = () => ws.close();
+
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.type === 'order_status_changed' && String(data.order_id) === String(ORDER_ID)) {
+                    applyStatus(data.status);
+                }
+            };
+        }
+
+        connectWS();
+    </script>
+</body>
+
+</html>
