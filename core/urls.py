@@ -1,5 +1,3 @@
-import os
-
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
@@ -20,11 +18,7 @@ urlpatterns = [
     path('', include('restaurants.urls')),
     path('ordering/', include('ordering.urls')),
 
-    # AR model files (.glb / .usdz) are stored on the local filesystem and
-    # committed to git, so they must be served in production too.
-    re_path(
-        r'^media/ar_models/(?P<path>.*)$',
-        serve,
-        {'document_root': os.path.join(settings.MEDIA_ROOT, 'ar_models')},
-    ),
+    # Media files (food images, AR models) are committed to git and always
+    # present on Railway — serve them directly in production too.
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -8,15 +8,16 @@ Required Railway environment variables:
   DATABASE_URL            = <auto-injected by Railway PostgreSQL plugin>
   REDIS_URL               = <auto-injected by Railway Redis plugin>
 
-S3-compatible media storage — works with Backblaze B2 (recommended, no CC),
-Cloudflare R2, or any S3-compatible provider.  Falls back to Railway's
-ephemeral local filesystem if any variable is missing.
+Media files (food images, AR models) are committed to git under media/ and
+served directly by Django via the permanent /media/ route in urls.py.
+No external storage service is required.
 
-  S3_ENDPOINT_URL      = https://s3.us-west-004.backblazeb2.com   (B2 example)
+Optional S3-compatible upgrade (Backblaze B2, Cloudflare R2, AWS S3, etc.):
+  S3_ENDPOINT_URL      = https://s3.us-west-004.backblazeb2.com
   S3_ACCESS_KEY_ID     = your key ID
   S3_SECRET_ACCESS_KEY = your application key / secret
-  S3_BUCKET_NAME       = your bucket name  (e.g. ar-restaurant-media)
-  S3_PUBLIC_DOMAIN     = f000.backblazeb2.com  (optional — friendly URL)
+  S3_BUCKET_NAME       = your bucket name
+  S3_PUBLIC_DOMAIN     = optional friendly URL
 """
 
 import dj_database_url

@@ -23,6 +23,8 @@ db.sqlite3
 media/*
 !media/ar_models
 !media/ar_models/**
+!media/menu_items
+!media/menu_items/**
 
 # Static files collected for production
 staticfiles/
