@@ -5,17 +5,13 @@ from django.db import models
 
 def _ar_storage():
     """
-    Return RawMediaCloudinaryStorage when cloudinary_storage is active (production),
-    or fall back to FileSystemStorage in development.
-    Raw resource type is required for non-image binary files (.glb, .usdz).
+    AR model files (.glb / .usdz) are always stored on the local filesystem.
+    They are committed to git so they survive Railway redeploys, and served
+    via a permanent /media/ar_models/ route added to urls.py.
+    Using Cloudinary for these files is intentionally avoided: the binary files
+    are too large for the free-tier upload limit and require 'raw' resource type
+    which conflicts with DEFAULT_FILE_STORAGE = MediaCloudinaryStorage.
     """
-    from django.conf import settings
-    if 'cloudinary_storage' in getattr(settings, 'INSTALLED_APPS', []):
-        try:
-            from cloudinary_storage.storage import RawMediaCloudinaryStorage
-            return RawMediaCloudinaryStorage()
-        except ImportError:
-            pass
     from django.core.files.storage import FileSystemStorage
     return FileSystemStorage()
 

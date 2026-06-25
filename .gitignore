@@ -20,7 +20,9 @@ env/
 # Django
 db.sqlite3
 *.log
-media/
+media/*
+!media/ar_models
+!media/ar_models/**
 
 # Static files collected for production
 staticfiles/
