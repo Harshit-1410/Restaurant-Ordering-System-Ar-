@@ -16,6 +16,47 @@ The three Django apps are fully separate with clear dependency direction:
 - `ordering` depends on `restaurants` (MenuItem FKs)
 - `billing` depends on `ordering` (TableSession FK) and `restaurants` (Restaurant FK)
 
+### billing app — Template Component Hierarchy
+
+```
+billing/templates/billing/
+  │
+  ├── login.html            Standalone (no sidebar). Staff login form.
+  │
+  └── base.html             Dark sidebar layout. All authenticated pages extend this.
+        │  Sidebar: Dashboard, Open Tables, Bill History, Reports (manager+), Kitchen link
+        │  Topbar: page title, live WebSocket dot, sign-out form
+        │  Blocks: title, page_title, nav_*, topbar_actions, content, extra_styles, extra_scripts
+        │
+        ├── dashboard.html        KPI cards (revenue, bills, guests, tables)
+        │                         Bill requests table + recent bills table
+        │                         JS: auto-refreshes KPI grid on WS events (setInterval 30s)
+        │
+        ├── open_bills.html       Grid of table cards, color-coded by elapsed time
+        │                         (green <30 min, orange 30–60 min, red >60 min)
+        │                         JS: reloads on bill_requested / table_closed WS events
+        │
+        ├── bill_detail.html      Two-column layout:
+        │                           Left  — orders grouped by Guest 1 / Guest 2 / …
+        │                           Right (sticky) — billing summary panel
+        │                                            + discount section (% or flat)
+        │                                            + payment method grid + amount input
+        │                                            + recorded payments list
+        │                                            + "Mark as Paid" button → confirm modal
+        │                         All mutations via fetch() POST → JSON response → DOM update
+        │
+        ├── receipt.html          Printable thermal-style white layout (font: monospace)
+        │                         print CSS hides sidebar/topbar; only receipt-paper visible
+        │
+        ├── history.html          Filter bar (date tabs, method select, table input, search)
+        │                         Sortable data-table of all bills with receipt links
+        │
+        └── reports.html          KPI row + period toggle (7-day / 30-day)
+                                  Chart.js line chart — revenue trend
+                                  Chart.js doughnut — payment method breakdown
+                                  Top items table (last 30 days)
+```
+
 ---
 
 ## 2. Settings Architecture

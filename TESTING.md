@@ -4,7 +4,16 @@ Manual test procedures for all major flows in the AR Restaurant Ordering System.
 
 ---
 
-## Setup
+## Automated Tests
+
+Run the Django test suite for all three apps:
+```bash
+python3 manage.py test ordering restaurants billing
+```
+
+---
+
+## Manual Test Setup
 
 Start the dev server:
 ```bash

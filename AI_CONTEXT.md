@@ -147,21 +147,38 @@ Restaurant ──< Table ──< TableSession ──< CustomerSession ──< Or
 
 ```
 /admin/                                  → Django admin
-/ordering/...                            → ordering app (cart, orders, kitchen, billing-legacy)
-/billing/                                → Billing Dashboard login redirect
-/billing/login/                          → Billing Dashboard login
-/billing/open/                           → Active table sessions
-/billing/bills/<session_id>/             → Bill detail (auto-generates Bill on first open)
-/billing/bills/<id>/discount/            → POST: apply discount
-/billing/bills/<id>/payment/             → POST: add payment
-/billing/bills/<id>/close/               → POST: mark paid + close TableSession
-/billing/bills/<id>/receipt/             → Printable receipt
-/billing/history/                        → Filterable bill history
-/billing/reports/                        → Analytics (Chart.js) — owner/manager only
-/<restaurant-slug>/                      → Customer menu (restaurants app catch-all)
-/<restaurant-slug>/?t=<qr_token>         → Menu with QR session join
-/ws/kitchen/<restaurant_id>/             → WebSocket: kitchen + billing events
-/ws/order/<order_id>/                    → WebSocket: order status updates
+
+/ordering/cart/add/                      → POST: add item to cart
+/ordering/cart/data/                     → GET: cart count + subtotal (JSON)
+/ordering/cart/remove/<cart_item_id>/    → POST: remove / decrement cart item
+/ordering/cart/                          → GET: cart page
+/ordering/place/                         → POST: place order
+/ordering/bill/request/                  → POST: customer requests bill
+/ordering/confirmation/<order_id>/       → GET: order confirmation page
+/ordering/kitchen/<restaurant_id>/       → GET: kitchen dashboard (unauthenticated)
+/ordering/billing/                       → GET: legacy billing view (unauthenticated)
+/ordering/billing/close/<session_id>/    → POST: close table session (legacy)
+
+/billing/                                → GET: dashboard (KPIs, bill requests) — redirects to login if not auth
+/billing/login/                          → GET/POST: staff login
+/billing/logout/                         → POST: staff logout
+/billing/open/                           → GET: all active table sessions
+/billing/bills/<session_id>/             → GET: bill detail (auto-generates Bill on first open)
+/billing/bills/<id>/recalc/              → POST: refresh totals from current orders (JSON)
+/billing/bills/<id>/discount/            → POST: apply discount (JSON)
+/billing/bills/<id>/discount/remove/     → POST: remove discount (JSON)
+/billing/bills/<id>/payment/             → POST: add a payment entry (JSON)
+/billing/bills/<id>/payment/<pid>/delete/ → POST: delete a payment entry (JSON)
+/billing/bills/<id>/close/               → POST: mark bill PAID + close TableSession (JSON)
+/billing/bills/<id>/receipt/             → GET: printable receipt page
+/billing/history/                        → GET: bill history with date/method/table/search filters
+/billing/reports/                        → GET: analytics + Chart.js charts (owner/manager only)
+
+/<restaurant-slug>/                      → GET: customer menu (restaurants app catch-all)
+/<restaurant-slug>/?t=<qr_token>         → GET: menu with QR session join
+
+/ws/kitchen/<restaurant_id>/             → WebSocket: kitchen + billing real-time events
+/ws/order/<order_id>/                    → WebSocket: order status updates for customer
 ```
 
 ---
@@ -247,16 +264,77 @@ All events broadcast to `kitchen_{restaurant_id}` group:
 
 ## 13. Creating Billing Staff (Production)
 
-After deploying, create a `StaffProfile` for the superuser via Django shell or admin:
+After deploying, open a Django shell on Railway:
+
+```bash
+railway run python3 manage.py shell
+```
+
+Then create a `StaffProfile` for the superuser:
 
 ```python
 from django.contrib.auth.models import User
 from restaurants.models import Restaurant
 from billing.models import StaffProfile
 
-user = User.objects.get(username='admin')
-restaurant = Restaurant.objects.first()
+user = User.objects.get(username='your_superuser_username')
+restaurant = Restaurant.objects.get(slug='your-restaurant-slug')
 StaffProfile.objects.create(user=user, restaurant=restaurant, role='owner')
+exit()
 ```
 
 Then log in at `/billing/login/`.
+
+Alternatively, use **Django Admin → Billing → Staff Profiles → Add** — no shell required.
+
+---
+
+## 14. Adding a New Restaurant (Production Checklist)
+
+Follow these steps in order every time a new restaurant is set up.
+
+### Step 1 — Create the Restaurant in Django Admin
+1. Go to `/admin/restaurants/restaurant/add/`.
+2. Fill in: **Name**, **Slug** (URL-safe, e.g. `my-cafe`), **Logo**, **Address**, **Phone**, **GST Number**.
+3. Tick **Is active**.
+4. Save. Note the `restaurant_id` from the URL (e.g. `/admin/restaurants/restaurant/**3**/change/`).
+
+### Step 2 — Add Categories and Menu Items
+1. Go to `/admin/restaurants/category/add/` → set Restaurant + Name + Image.
+2. Go to `/admin/restaurants/menuitem/add/` → fill Category, Name, Price, Image.
+3. For AR: upload `.glb` (Android) and `.usdz` (iOS) files. After saving, commit the new files:
+   ```bash
+   git add media/
+   git commit -m "chore: add AR models for <restaurant>"
+   git push origin main
+   ```
+
+### Step 3 — Create Tables and QR Codes
+1. Go to `/admin/ordering/table/add/`.
+2. Set **Restaurant**, **Table Number** (e.g. `1`, `2`, `3`). Leave **QR Token** blank — it is auto-generated.
+3. Tick **Is active**. Save.
+4. Back in the Table list, copy the **QR URL (full)** field for each table (it is an absolute URL like `https://web-production-cac8d9.up.railway.app/my-cafe/?t=<token>`).
+5. Paste each URL into a QR code generator (e.g. [qr-code-generator.com](https://www.qr-code-generator.com)) and print/laminate for each table.
+
+### Step 4 — Create a Staff Profile for the Cashier
+```bash
+railway run python3 manage.py shell
+```
+```python
+from django.contrib.auth.models import User
+from restaurants.models import Restaurant
+from billing.models import StaffProfile
+
+# Create a login for the cashier if they don't have one yet
+user = User.objects.create_user(username='cashier1', password='securepassword')
+restaurant = Restaurant.objects.get(slug='my-cafe')
+StaffProfile.objects.create(user=user, restaurant=restaurant, role='cashier')
+exit()
+```
+
+### Step 5 — Verify
+| Check | URL |
+|---|---|
+| Menu visible | `https://…/my-cafe/?t=<any_table_token>` |
+| Kitchen dashboard | `https://…/ordering/kitchen/<restaurant_id>/` |
+| Billing dashboard | `https://…/billing/` (log in as cashier) |
