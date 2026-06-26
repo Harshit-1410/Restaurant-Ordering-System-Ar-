@@ -140,8 +140,15 @@
 <body>
     <div class="card">
         <div class="check" id="status-icon">✅</div>
+        {% with name=order.customer_session.customer_name %}
+        {% if name %}
+        <h1>Thank you, {{ name }}!</h1>
+        <p>Your order has been sent to the kitchen.<br>We'll have it ready shortly.</p>
+        {% else %}
         <h1>Order Placed!</h1>
         <p>Your order has been sent to the kitchen.<br>We'll have it ready shortly.</p>
+        {% endif %}
+        {% endwith %}
 
         <div class="order-num">
             Order number
@@ -168,6 +175,7 @@
 
         <a class="back-btn" href="/">Order more</a>
     </div>
+    
 
     <script>
         const ORDER_ID = {{ order.id }};

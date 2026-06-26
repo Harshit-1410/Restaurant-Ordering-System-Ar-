@@ -532,7 +532,7 @@
                     <div class="guest-col" id="guest-{{ cs.id }}">
                         <div class="guest-label">
                             <span class="guest-dot"></span>
-                            Guest {{ forloop.counter }} · {{ cs.created_at|time:"H:i" }}
+                            {% if cs.customer_name %}{{ cs.customer_name }}{% else %}Guest {{ forloop.counter }}{% endif %} · {{ cs.created_at|time:"H:i" }}
                         </div>
 
                         {% for order in cs.orders.all %}
@@ -809,10 +809,19 @@ function connectWS() {
 
         if (data.type === 'new_order') {
             beep(880, 0.35);
-            showToast(`New order #${data.order_id} — Table ${data.table}`, '#f39c12');
+            const displayName = data.customer_name || `Order #${data.order_id}`;
+            showToast(`New order — ${displayName}, Table ${data.table}`, '#f39c12');
 
             const guestCol = document.getElementById(`guest-${data.customer_session_id}`);
             if (guestCol) {
+                /* Update guest label with name if not already set */
+                if (data.customer_name) {
+                    const label = guestCol.querySelector('.guest-label');
+                    if (label) {
+                        const timeText = label.textContent.split('·').pop().trim();
+                        label.innerHTML = `<span class="guest-dot"></span>${data.customer_name} · ${timeText}`;
+                    }
+                }
                 guestCol.querySelectorAll('.no-orders-msg').forEach(el => el.remove());
                 guestCol.insertAdjacentHTML('beforeend', buildOrderCard(data));
                 applyFilter(currentFilter, null);

@@ -210,10 +210,31 @@ def cart_detail(request):
         total      = 0
 
     return render(request, 'ordering/cart.html', {
-        'cart_items': cart_items,
-        'total':      total,
-        'restaurant': cs.table_session.table.restaurant,
+        'cart_items':    cart_items,
+        'total':         total,
+        'restaurant':    cs.table_session.table.restaurant,
+        'customer_name': cs.customer_name,
     })
+
+
+@require_POST
+def save_customer_name(request):
+    """POST /ordering/session/name/ — persist customer_name on the CustomerSession."""
+    cs = get_active_customer_session(request)
+    if not cs:
+        return JsonResponse({'status': 'error', 'message': 'No active session.'}, status=400)
+    try:
+        data = json.loads(request.body)
+        name = data.get('name', '').strip()
+    except (json.JSONDecodeError, AttributeError):
+        name = request.POST.get('name', '').strip()
+
+    if not name:
+        return JsonResponse({'status': 'error', 'message': 'Name is required.'}, status=400)
+
+    cs.customer_name = name[:100]
+    cs.save(update_fields=['customer_name'])
+    return JsonResponse({'status': 'ok', 'name': cs.customer_name})
 
 
 @require_POST
@@ -287,6 +308,7 @@ def place_order(request):
                 'table':               ts.table_number,
                 'session_id':          ts.id,
                 'customer_session_id': cs.id,
+                'customer_name':       cs.customer_name,
                 'items': [
                     {'name': oi.menu_item.name, 'quantity': oi.quantity, 'notes': oi.notes}
                     for oi in order.items.select_related('menu_item').all()

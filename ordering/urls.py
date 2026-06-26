@@ -21,6 +21,7 @@ urlpatterns = [
     path('place/',                             views.place_order,        name='place_order'),
     path('confirmation/<int:order_id>/',       views.order_confirmation, name='order_confirmation'),
     path('session/orders/',                    views.session_orders,     name='session_orders'),
+    path('session/name/',                      views.save_customer_name, name='session_name'),
     path('status/update/',                     views.update_order_status, name='update_status'),
 
     # ── Bill ─────────────────────────────────────────────────────────────────

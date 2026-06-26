@@ -144,19 +144,22 @@ class CustomerSession(models.Model):
     Identified by a browser_uuid generated server-side and stored in the
     Django session cookie — never trusted from a URL parameter.
     """
-    table_session = models.ForeignKey(
+    table_session  = models.ForeignKey(
         TableSession, on_delete=models.CASCADE, related_name='customer_sessions'
     )
-    browser_uuid  = models.CharField(max_length=64)
-    created_at    = models.DateTimeField(auto_now_add=True)
-    last_seen     = models.DateTimeField(auto_now=True)
+    browser_uuid   = models.CharField(max_length=64)
+    customer_name  = models.CharField(max_length=100, blank=True,
+        help_text='Optional display name entered by the customer in the cart.')
+    created_at     = models.DateTimeField(auto_now_add=True)
+    last_seen      = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = [('table_session', 'browser_uuid')]
         ordering        = ['created_at']
 
     def __str__(self):
-        return f"Guest {self.id} @ Table {self.table_session.table_number}"
+        display = self.customer_name or f"Guest {self.id}"
+        return f"{display} @ Table {self.table_session.table_number}"
 
 
 # ── Cart ──────────────────────────────────────────────────────────────────────
