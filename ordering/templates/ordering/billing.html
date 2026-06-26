@@ -168,10 +168,7 @@
     </div>
     <div class="grid" id="tables-grid">
         {% for session in sessions %}
-        {% with
-            customer_count=session.customer_sessions.count
-            order_count=session.orders.count
-        %}
+        {% with customer_count=session.customer_sessions.count order_count=session.orders.count %}
         <div class="table-card {% if session.bill_requested_at %}requested{% endif %}"
              id="card-{{ session.id }}">
             <div class="card-top">
