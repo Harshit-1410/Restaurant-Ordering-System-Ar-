@@ -19,13 +19,21 @@ from ordering.models import TableSession
 # ── Staff / roles ─────────────────────────────────────────────────────────────
 
 class StaffProfile(models.Model):
+    # Current roles
     ROLE_OWNER   = 'owner'
     ROLE_MANAGER = 'manager'
     ROLE_CASHIER = 'cashier'
+    ROLE_KITCHEN = 'kitchen'
+    # Future roles (reserved, not yet active):
+    #   ROLE_WAITER   = 'waiter'
+    #   ROLE_ADMIN    = 'admin'
+    #   ROLE_CHEF     = 'chef'
+    #   ROLE_BRANCH_MANAGER = 'branch_manager'
     ROLES = [
         (ROLE_OWNER,   'Owner'),
         (ROLE_MANAGER, 'Manager'),
         (ROLE_CASHIER, 'Cashier'),
+        (ROLE_KITCHEN, 'Kitchen Staff'),
     ]
 
     user       = models.OneToOneField(User, on_delete=models.CASCADE, related_name='staff_profile')
@@ -167,3 +175,39 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"₹{self.amount} {self.get_payment_method_display()} — {self.bill.bill_number}"
+
+
+# ── Audit Log ─────────────────────────────────────────────────────────────────
+
+class StaffAuditLog(models.Model):
+    """
+    Immutable record of every login, logout, and failed login attempt.
+    Never deleted — used for security monitoring and shift auditing.
+    """
+    ACTION_LOGIN        = 'login'
+    ACTION_LOGOUT       = 'logout'
+    ACTION_LOGIN_FAILED = 'login_failed'
+    ACTIONS = [
+        (ACTION_LOGIN,        'Login'),
+        (ACTION_LOGOUT,       'Logout'),
+        (ACTION_LOGIN_FAILED, 'Login Failed'),
+    ]
+
+    staff_profile      = models.ForeignKey(
+        StaffProfile, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='audit_logs',
+        help_text='Null for failed login attempts where user is unknown.',
+    )
+    action             = models.CharField(max_length=20, choices=ACTIONS)
+    username_attempted = models.CharField(max_length=150, blank=True,
+        help_text='Username entered during login (useful for failed attempts).')
+    ip_address         = models.GenericIPAddressField(null=True, blank=True)
+    user_agent         = models.TextField(blank=True)
+    timestamp          = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        who = self.staff_profile or self.username_attempted or 'unknown'
+        return f"{self.get_action_display()} — {who} @ {self.timestamp:%Y-%m-%d %H:%M}"

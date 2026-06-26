@@ -15,15 +15,107 @@ from decimal import Decimal
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from billing.decorators import KITCHEN_LOGIN_URL, KITCHEN_ROLES, kitchen_required
 from restaurants.models import MenuItem, Restaurant
 
 from .models import Cart, CartItem, CustomerSession, Order, OrderItem, TableSession
 from .session import get_active_customer_session
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Auth helpers (shared by kitchen login / logout + audit logging)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _get_client_ip(request):
+    """Return the real client IP, respecting X-Forwarded-For from proxies."""
+    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+
+def _log_audit(profile, action, username, request):
+    """Write a StaffAuditLog entry. Import is lazy to avoid circular imports."""
+    try:
+        from billing.models import StaffAuditLog
+        StaffAuditLog.objects.create(
+            staff_profile=profile,
+            action=action,
+            username_attempted=username,
+            ip_address=_get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+        )
+    except Exception:
+        pass  # audit logging must never break the request
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Kitchen authentication views
+# ─────────────────────────────────────────────────────────────────────────────
+
+def kitchen_login_view(request):
+    """
+    GET  /ordering/kitchen/login/ — render the kitchen login page.
+    POST /ordering/kitchen/login/ — authenticate and redirect.
+    """
+    # Redirect already-authenticated kitchen staff to their dashboard
+    if request.user.is_authenticated:
+        try:
+            profile = request.user.staff_profile
+            if profile.is_active and profile.role in KITCHEN_ROLES:
+                return redirect('ordering:kitchen', restaurant_id=profile.restaurant.id)
+        except Exception:
+            pass
+
+    error = None
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+        remember  = request.POST.get('remember_me')
+
+        user = authenticate(request, username=username, password=password)
+        if user is None:
+            _log_audit(None, 'login_failed', username, request)
+            error = 'Invalid username or password.'
+        else:
+            profile = getattr(user, 'staff_profile', None)
+            if profile is None or not profile.is_active:
+                _log_audit(None, 'login_failed', username, request)
+                error = 'Account not found or inactive. Contact your manager.'
+            elif profile.role not in KITCHEN_ROLES:
+                _log_audit(None, 'login_failed', username, request)
+                error = 'You do not have access to the Kitchen Dashboard.'
+            else:
+                login(request, user)
+                _log_audit(profile, 'login', username, request)
+                if not remember:
+                    request.session.set_expiry(0)  # expires on browser close
+                else:
+                    request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+                next_url = request.GET.get('next', '')
+                if next_url.startswith('/ordering/kitchen/') and 'login' not in next_url:
+                    return redirect(next_url)
+                return redirect('ordering:kitchen', restaurant_id=profile.restaurant.id)
+
+    return render(request, 'ordering/kitchen_login.html', {'error': error})
+
+
+def kitchen_logout_view(request):
+    """POST /ordering/kitchen/logout/ — log the user out and redirect to kitchen login."""
+    if request.user.is_authenticated:
+        try:
+            profile = request.user.staff_profile
+            _log_audit(profile, 'logout', request.user.username, request)
+        except Exception:
+            pass
+    logout(request)
+    return redirect(KITCHEN_LOGIN_URL)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -246,12 +338,19 @@ def session_orders(request):
 # Kitchen dashboard
 # ─────────────────────────────────────────────────────────────────────────────
 
+@kitchen_required
 def kitchen_dashboard(request, restaurant_id):
-    """GET /ordering/kitchen/<restaurant_id>/ — real-time kitchen view."""
+    """GET /ordering/kitchen/<restaurant_id>/ — real-time kitchen view (staff only)."""
     restaurant = get_object_or_404(Restaurant, id=restaurant_id)
 
-    # Load all open sessions for this restaurant, grouped by table.
-    # Prefetch the full order tree so the template never hits the DB per row.
+    # Safety: if the authenticated staff belongs to a different restaurant, redirect them.
+    try:
+        staff_restaurant_id = request.user.staff_profile.restaurant.id
+        if staff_restaurant_id != restaurant_id and request.user.staff_profile.role not in ('owner',):
+            return redirect('ordering:kitchen', restaurant_id=staff_restaurant_id)
+    except Exception:
+        pass
+
     active_sessions = (
         TableSession.objects
         .filter(table__restaurant=restaurant, status=TableSession.STATUS_OPEN)
@@ -262,15 +361,26 @@ def kitchen_dashboard(request, restaurant_id):
         .order_by('table__table_number', 'started_at')
     )
 
+    profile = getattr(request.user, 'staff_profile', None)
+
     return render(request, 'ordering/kitchen.html', {
         'restaurant':      restaurant,
         'active_sessions': active_sessions,
+        'profile':         profile,
     })
 
 
 @require_POST
 def update_order_status(request):
-    """POST /ordering/status/update/ — change status of an order."""
+    """POST /ordering/status/update/ — change status of an order (kitchen staff only)."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'Authentication required.'}, status=401)
+    try:
+        profile = request.user.staff_profile
+        if not profile.is_active or profile.role not in KITCHEN_ROLES:
+            return JsonResponse({'status': 'error', 'message': 'Access denied.'}, status=403)
+    except Exception:
+        return JsonResponse({'status': 'error', 'message': 'Access denied.'}, status=403)
     try:
         data  = json.loads(request.body)
         order = get_object_or_404(Order, id=data['order_id'])

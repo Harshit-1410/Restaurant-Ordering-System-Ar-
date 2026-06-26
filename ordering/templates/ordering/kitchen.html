@@ -7,33 +7,257 @@
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+        :root {
+            --bg:       #0d0d0d;
+            --surface:  #161616;
+            --surface2: #1e1e1e;
+            --border:   #272727;
+            --accent:   #f39c12;
+            --text:     #f0f0f0;
+            --muted:    #888;
+            --sidebar-w: 220px;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #111;
-            color: #fff;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* ══════════════════════════════════════════════════════
+           SIDEBAR
+        ══════════════════════════════════════════════════════ */
+        .k-sidebar {
+            width: var(--sidebar-w);
+            min-height: 100vh;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0; left: 0;
+            z-index: 200;
+            transition: transform 0.25s ease;
+        }
+        .k-sidebar.collapsed { transform: translateX(calc(-1 * var(--sidebar-w))); }
+
+        .sidebar-brand {
+            padding: 20px 18px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .sidebar-brand-icon {
+            font-size: 22px;
+            margin-bottom: 6px;
+        }
+        .sidebar-brand-name {
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sidebar-brand-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-top: 1px;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 10px 0;
+            overflow-y: auto;
+        }
+        .nav-section-label {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #444;
+            padding: 14px 18px 4px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            cursor: pointer;
+            border-radius: 0;
+            transition: background 0.15s, color 0.15s;
+            text-decoration: none;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+        .nav-item:hover { background: var(--surface2); color: var(--text); }
+        .nav-item.active {
+            background: rgba(243,156,18,0.1);
+            color: var(--accent);
+            border-right: 3px solid var(--accent);
+        }
+        .nav-item .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+        .nav-item .nav-badge {
+            margin-left: auto;
+            background: var(--accent);
+            color: #000;
+            font-size: 10px;
+            font-weight: 800;
+            border-radius: 10px;
+            padding: 1px 7px;
+            display: none;
+        }
+        .nav-item .nav-badge.visible { display: inline-block; }
+
+        .sidebar-footer {
+            padding: 14px 18px;
+            border-top: 1px solid var(--border);
+        }
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .user-avatar {
+            width: 34px; height: 34px;
+            background: linear-gradient(135deg, #f39c12, #d68910);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px;
+            font-weight: 800;
+            color: #000;
+            flex-shrink: 0;
+        }
+        .user-info { overflow: hidden; }
+        .user-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .user-role {
+            font-size: 10px;
+            color: var(--muted);
+            text-transform: capitalize;
+            margin-top: 1px;
+        }
+        .btn-logout {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 9px 12px;
+            background: rgba(231,76,60,0.08);
+            border: 1px solid rgba(231,76,60,0.2);
+            border-radius: 8px;
+            color: #e74c3c;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-logout:hover { background: rgba(231,76,60,0.15); }
+
+        /* Mobile sidebar toggle */
+        .sidebar-toggle {
+            display: none;
+            position: fixed;
+            top: 12px; left: 12px;
+            z-index: 300;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            cursor: pointer;
+            color: var(--text);
+            font-size: 18px;
+        }
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 150;
+        }
+
+        /* ══════════════════════════════════════════════════════
+           MAIN AREA
+        ══════════════════════════════════════════════════════ */
+        .k-main {
+            flex: 1;
+            margin-left: var(--sidebar-w);
+            display: flex;
+            flex-direction: column;
             min-height: 100vh;
         }
 
-        /* ── Header ── */
-        .header {
-            background: #1a1a1a;
+        /* ── Top bar ── */
+        .k-header {
+            background: var(--surface);
             padding: 14px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid #2a2a2a;
+            border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
             z-index: 100;
         }
-        .header h1  { font-size: 17px; font-weight: 700; }
-        .header-right { display: flex; align-items: center; gap: 14px; }
+        .k-header-left h1  { font-size: 16px; font-weight: 700; }
+        .k-header-left .sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+        .k-header-right { display: flex; align-items: center; gap: 14px; }
         .ws-dot { width: 9px; height: 9px; border-radius: 50%; background: #e74c3c; }
         .ws-dot.connected { background: #2ecc71; }
-        .ws-label { font-size: 12px; color: #888; }
+        .ws-label { font-size: 12px; color: var(--muted); }
 
-        /* ── Layout ── */
-        .main { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+        /* ── Filter tabs ── */
+        .filter-bar {
+            padding: 14px 24px 0;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+        .filter-tab {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            background: transparent;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .filter-tab:hover { color: var(--text); }
+        .filter-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .filter-count {
+            display: inline-block;
+            background: var(--surface2);
+            color: var(--muted);
+            border-radius: 10px;
+            font-size: 10px;
+            padding: 1px 6px;
+            margin-left: 5px;
+        }
+        .filter-tab.active .filter-count { background: rgba(243,156,18,0.15); color: var(--accent); }
+
+        /* ── Content ── */
+        .main { padding: 20px 24px; }
 
         .empty-state {
             text-align: center;
@@ -51,6 +275,7 @@
             margin-bottom: 18px;
             overflow: hidden;
         }
+        .table-section.hidden-by-filter { display: none; }
 
         .table-header {
             background: #1e1e1e;
@@ -60,12 +285,8 @@
             gap: 10px;
             border-bottom: 1px solid #272727;
         }
-        .table-num {
-            font-size: 18px;
-            font-weight: 800;
-            color: #fff;
-        }
-        .guest-pill {
+        .table-num   { font-size: 18px; font-weight: 800; color: #fff; }
+        .guest-pill  {
             background: #2a2a2a;
             color: #aaa;
             font-size: 11px;
@@ -83,10 +304,7 @@
             border-radius: 6px;
             animation: pulse-badge 1.5s ease infinite;
         }
-        @keyframes pulse-badge {
-            0%, 100% { opacity: 1; }
-            50%       { opacity: 0.65; }
-        }
+        @keyframes pulse-badge { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
 
         /* ── Guest rows ── */
         .guests-grid {
@@ -94,13 +312,11 @@
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 0;
         }
-
         .guest-col {
             border-right: 1px solid #222;
             padding: 14px 16px;
         }
         .guest-col:last-child { border-right: none; }
-
         .guest-label {
             font-size: 11px;
             font-weight: 700;
@@ -108,16 +324,9 @@
             letter-spacing: 0.8px;
             color: #555;
             margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            display: flex; align-items: center; gap: 6px;
         }
-        .guest-dot {
-            width: 7px; height: 7px;
-            border-radius: 50%;
-            background: #3498db;
-            flex-shrink: 0;
-        }
+        .guest-dot { width: 7px; height: 7px; border-radius: 50%; background: #3498db; flex-shrink: 0; }
 
         /* ── Order card ── */
         .order-card {
@@ -127,9 +336,8 @@
             padding: 12px 14px;
             margin-bottom: 10px;
         }
-        .order-card.flash-new {
-            animation: flash-new 0.5s ease 3;
-        }
+        .order-card.hidden-by-filter { display: none; }
+        .order-card.flash-new { animation: flash-new 0.5s ease 3; }
         @keyframes flash-new {
             0%, 100% { border-color: #2d2d2d; }
             50%       { border-color: #f39c12; }
@@ -141,17 +349,13 @@
             align-items: center;
             margin-bottom: 8px;
         }
-        .order-id   { font-size: 13px; font-weight: 700; }
+        .order-id    { font-size: 13px; font-weight: 700; }
         .order-total { font-size: 12px; color: #888; }
 
         .status-badge {
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 2px 7px;
-            border-radius: 4px;
-            margin-left: 6px;
+            font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 2px 7px; border-radius: 4px; margin-left: 6px;
         }
         .status-pending   { background: #3b2b06; color: #f39c12; }
         .status-preparing { background: #0a2a44; color: #3498db; }
@@ -159,167 +363,242 @@
         .status-served    { background: #222;    color: #666; }
         .status-cancelled { background: #2b0a0a; color: #e74c3c; }
 
-        .order-items {
-            margin-bottom: 10px;
-        }
+        .order-items { margin-bottom: 10px; }
         .item-row {
-            display: flex;
-            align-items: baseline;
-            gap: 4px;
-            font-size: 13px;
-            color: #ccc;
-            padding: 3px 0;
-            border-bottom: 1px solid #252525;
+            display: flex; align-items: baseline; gap: 4px;
+            font-size: 13px; color: #ccc;
+            padding: 3px 0; border-bottom: 1px solid #252525;
         }
         .item-row:last-child { border: none; }
-        .item-qty { color: #888; font-variant-numeric: tabular-nums; min-width: 22px; }
+        .item-qty   { color: #888; font-variant-numeric: tabular-nums; min-width: 22px; }
         .item-notes { font-size: 11px; color: #666; margin-top: 1px; }
 
         .order-actions { display: flex; gap: 5px; flex-wrap: wrap; }
         .btn-action {
-            flex: 1;
-            padding: 7px 4px;
-            border-radius: 7px;
-            border: none;
-            font-size: 11px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: opacity 0.2s;
+            flex: 1; padding: 7px 4px; border-radius: 7px;
+            border: none; font-size: 11px; font-weight: 700;
+            cursor: pointer; transition: opacity 0.2s;
         }
         .btn-action:hover { opacity: 0.85; }
-        .btn-prepare  { background: #3498db; color: #fff; }
-        .btn-ready    { background: #2ecc71; color: #000; }
-        .btn-served   { background: #555;    color: #fff; }
-        .btn-cancel   { background: #c0392b; color: #fff; }
+        .btn-prepare { background: #3498db; color: #fff; }
+        .btn-ready   { background: #2ecc71; color: #000; }
+        .btn-served  { background: #555;    color: #fff; }
+        .btn-cancel  { background: #c0392b; color: #fff; }
 
-        .no-orders-msg {
-            font-size: 12px;
-            color: #444;
-            padding: 10px 0;
-            text-align: center;
-        }
+        .no-orders-msg { font-size: 12px; color: #444; padding: 10px 0; text-align: center; }
 
         /* ── Toast ── */
         .toast {
             position: fixed;
-            top: 66px;
-            right: 18px;
-            background: #2ecc71;
-            color: #fff;
-            padding: 11px 18px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            display: none;
-            z-index: 999;
+            top: 66px; right: 18px;
+            background: #2ecc71; color: #fff;
+            padding: 11px 18px; border-radius: 8px;
+            font-size: 13px; font-weight: 600;
+            display: none; z-index: 999;
             max-width: 320px;
         }
 
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .k-sidebar    { transform: translateX(calc(-1 * var(--sidebar-w))); }
+            .k-sidebar.open { transform: translateX(0); }
+            .k-main       { margin-left: 0; }
+            .sidebar-toggle  { display: block; }
+            .sidebar-overlay { display: none; }
+            .sidebar-overlay.visible { display: block; }
+            .k-header     { padding-left: 56px; }
+        }
         @media (max-width: 640px) {
-            .main { padding: 12px; }
-            .guests-grid { grid-template-columns: 1fr; }
-            .guest-col { border-right: none; border-bottom: 1px solid #222; }
+            .main         { padding: 12px; }
+            .guests-grid  { grid-template-columns: 1fr; }
+            .guest-col    { border-right: none; border-bottom: 1px solid #222; }
             .guest-col:last-child { border-bottom: none; }
         }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h1>{{ restaurant.name }} — Kitchen</h1>
-    <div class="header-right">
-        <a href="{% url 'ordering:billing' restaurant.id %}"
-           style="color:#f39c12;text-decoration:none;font-size:13px;font-weight:700;">
-            Billing &rarr;
-        </a>
-        <span class="ws-label" id="ws-label">Connecting…</span>
-        <div class="ws-dot" id="ws-dot"></div>
+<!-- Sidebar toggle (mobile only) -->
+<button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- ════════════════════════════════════ SIDEBAR ════════════════════════════════════ -->
+<nav class="k-sidebar" id="kSidebar">
+    <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">🍳</div>
+        <div class="sidebar-brand-name">{{ restaurant.name }}</div>
+        <div class="sidebar-brand-label">Kitchen</div>
+    </div>
+
+    <div class="sidebar-nav">
+        <div class="nav-section-label">Views</div>
+        <button class="nav-item active" onclick="applyFilter('all', this)" id="nav-all">
+            <span class="nav-icon">📋</span>
+            <span>Dashboard</span>
+            <span class="nav-badge" id="badge-all"></span>
+        </button>
+        <button class="nav-item" onclick="applyFilter('pending', this)" id="nav-pending">
+            <span class="nav-icon">🕐</span>
+            <span>Active Orders</span>
+            <span class="nav-badge" id="badge-pending"></span>
+        </button>
+        <button class="nav-item" onclick="applyFilter('preparing', this)" id="nav-preparing">
+            <span class="nav-icon">🔥</span>
+            <span>Preparing</span>
+            <span class="nav-badge" id="badge-preparing"></span>
+        </button>
+        <button class="nav-item" onclick="applyFilter('ready', this)" id="nav-ready">
+            <span class="nav-icon">✅</span>
+            <span>Ready</span>
+            <span class="nav-badge" id="badge-ready"></span>
+        </button>
+        <button class="nav-item" onclick="applyFilter('served', this)" id="nav-served">
+            <span class="nav-icon">🍽️</span>
+            <span>Completed</span>
+            <span class="nav-badge" id="badge-served"></span>
+        </button>
+    </div>
+
+    <div class="sidebar-footer">
+        {% if profile %}
+        <div class="sidebar-user">
+            <div class="user-avatar">{{ request.user.username|first|upper }}</div>
+            <div class="user-info">
+                <div class="user-name">{{ request.user.username }}</div>
+                <div class="user-role">{{ profile.get_role_display }}</div>
+            </div>
+        </div>
+        {% endif %}
+        <form method="post" action="{% url 'ordering:kitchen_logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-logout">
+                <span>⎋</span> Logout
+            </button>
+        </form>
+    </div>
+</nav>
+
+<!-- ════════════════════════════════════ MAIN AREA ════════════════════════════════════ -->
+<div class="k-main">
+
+    <!-- Top bar -->
+    <div class="k-header">
+        <div class="k-header-left">
+            <h1>{{ restaurant.name }} — Kitchen</h1>
+            <div class="sub" id="ws-label">Connecting…</div>
+        </div>
+        <div class="k-header-right">
+            <span class="ws-label" id="ws-label-text">Live</span>
+            <div class="ws-dot" id="ws-dot"></div>
+        </div>
+    </div>
+
+    <!-- Filter tabs (desktop complement to sidebar) -->
+    <div class="filter-bar">
+        <button class="filter-tab active" onclick="applyFilter('all', this)" data-filter="all">
+            All <span class="filter-count" id="fc-all">0</span>
+        </button>
+        <button class="filter-tab" onclick="applyFilter('pending', this)" data-filter="pending">
+            Pending <span class="filter-count" id="fc-pending">0</span>
+        </button>
+        <button class="filter-tab" onclick="applyFilter('preparing', this)" data-filter="preparing">
+            Preparing <span class="filter-count" id="fc-preparing">0</span>
+        </button>
+        <button class="filter-tab" onclick="applyFilter('ready', this)" data-filter="ready">
+            Ready <span class="filter-count" id="fc-ready">0</span>
+        </button>
+        <button class="filter-tab" onclick="applyFilter('served', this)" data-filter="served">
+            Served <span class="filter-count" id="fc-served">0</span>
+        </button>
+    </div>
+
+    <!-- Orders -->
+    <div class="main" id="ordersContainer">
+        {% if active_sessions %}
+            {% for session in active_sessions %}
+            {% with total_customers=session.customer_sessions.count %}
+            <div class="table-section" id="ts-{{ session.id }}">
+
+                <div class="table-header">
+                    <span class="table-num">Table {{ session.table_number }}</span>
+                    <span class="guest-pill">{{ total_customers }} guest{{ total_customers|pluralize }}</span>
+                    {% if session.bill_requested_at %}
+                    <span class="bill-badge">🧾 Bill Requested</span>
+                    {% endif %}
+                </div>
+
+                <div class="guests-grid">
+                    {% for cs in session.customer_sessions.all %}
+                    <div class="guest-col" id="guest-{{ cs.id }}">
+                        <div class="guest-label">
+                            <span class="guest-dot"></span>
+                            Guest {{ forloop.counter }} · {{ cs.created_at|time:"H:i" }}
+                        </div>
+
+                        {% for order in cs.orders.all %}
+                        {% if order.status != 'cancelled' %}
+                        <div class="order-card" id="order-{{ order.id }}" data-status="{{ order.status }}">
+                            <div class="order-meta">
+                                <span class="order-id">
+                                    #{{ order.id }}
+                                    <span class="status-badge status-{{ order.status }}">{{ order.status }}</span>
+                                </span>
+                                <span class="order-total">₹{{ order.total_amount }}</span>
+                            </div>
+                            <div class="order-items">
+                                {% for item in order.items.all %}
+                                <div class="item-row">
+                                    <span class="item-qty">{{ item.quantity }}×</span>
+                                    <span>{{ item.menu_item.name }}</span>
+                                </div>
+                                {% if item.notes %}
+                                <div class="item-notes" style="padding-left:26px">{{ item.notes }}</div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="order-actions" id="actions-{{ order.id }}">
+                                {% if order.status == 'pending' %}
+                                <button class="btn-action btn-prepare" onclick="updateStatus({{ order.id }}, 'preparing')">Start Preparing</button>
+                                <button class="btn-action btn-cancel"  onclick="updateStatus({{ order.id }}, 'cancelled')">Cancel</button>
+                                {% elif order.status == 'preparing' %}
+                                <button class="btn-action btn-ready"  onclick="updateStatus({{ order.id }}, 'ready')">Mark Ready</button>
+                                {% elif order.status == 'ready' %}
+                                <button class="btn-action btn-served" onclick="updateStatus({{ order.id }}, 'served')">Mark Served</button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% empty %}
+                        <div class="no-orders-msg">No orders yet.</div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endwith %}
+            {% endfor %}
+        {% else %}
+        <div class="empty-state" id="emptyState">
+            <strong>Kitchen is quiet</strong>
+            No active tables right now.
+        </div>
+        {% endif %}
     </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<div class="main">
-    {% if active_sessions %}
-        {% for session in active_sessions %}
-        {# Count only customers who have at least one non-cancelled order #}
-        {% with total_customers=session.customer_sessions.count %}
-        <div class="table-section" id="ts-{{ session.id }}">
-
-            <div class="table-header">
-                <span class="table-num">Table {{ session.table_number }}</span>
-                <span class="guest-pill">{{ total_customers }} guest{{ total_customers|pluralize }}</span>
-                {% if session.bill_requested_at %}
-                <span class="bill-badge">🧾 Bill Requested</span>
-                {% endif %}
-            </div>
-
-            <div class="guests-grid">
-                {% for cs in session.customer_sessions.all %}
-                <div class="guest-col" id="guest-{{ cs.id }}">
-                    <div class="guest-label">
-                        <span class="guest-dot"></span>
-                        Guest {{ forloop.counter }} · {{ cs.created_at|time:"H:i" }}
-                    </div>
-
-                    {% for order in cs.orders.all %}
-                    {% if order.status != 'cancelled' %}
-                    <div class="order-card" id="order-{{ order.id }}">
-                        <div class="order-meta">
-                            <span class="order-id">
-                                #{{ order.id }}
-                                <span class="status-badge status-{{ order.status }}">{{ order.status }}</span>
-                            </span>
-                            <span class="order-total">₹{{ order.total_amount }}</span>
-                        </div>
-                        <div class="order-items">
-                            {% for item in order.items.all %}
-                            <div class="item-row">
-                                <span class="item-qty">{{ item.quantity }}×</span>
-                                <span>{{ item.menu_item.name }}</span>
-                            </div>
-                            {% if item.notes %}
-                            <div class="item-notes" style="padding-left:26px">{{ item.notes }}</div>
-                            {% endif %}
-                            {% endfor %}
-                        </div>
-                        <div class="order-actions" id="actions-{{ order.id }}">
-                            {% if order.status == 'pending' %}
-                            <button class="btn-action btn-prepare" onclick="updateStatus({{ order.id }}, 'preparing')">Start Preparing</button>
-                            <button class="btn-action btn-cancel"  onclick="updateStatus({{ order.id }}, 'cancelled')">Cancel</button>
-                            {% elif order.status == 'preparing' %}
-                            <button class="btn-action btn-ready"  onclick="updateStatus({{ order.id }}, 'ready')">Mark Ready</button>
-                            {% elif order.status == 'ready' %}
-                            <button class="btn-action btn-served" onclick="updateStatus({{ order.id }}, 'served')">Mark Served</button>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-                    {% empty %}
-                    <div class="no-orders-msg">No orders yet.</div>
-                    {% endfor %}
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endwith %}
-        {% endfor %}
-    {% else %}
-    <div class="empty-state">
-        <strong>Kitchen is quiet</strong>
-        No active tables right now.
-    </div>
-    {% endif %}
-</div>
-
 <script>
 const RESTAURANT_ID = {{ restaurant.id }};
+let currentFilter = 'all';
 
+/* ── CSRF helper ── */
 function getCookie(name) {
     const m = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
     return m ? m[2] : null;
 }
 
+/* ── Toast ── */
 function showToast(msg, color = '#2ecc71') {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -329,6 +608,7 @@ function showToast(msg, color = '#2ecc71') {
     t._timer = setTimeout(() => { t.style.display = 'none'; }, 3500);
 }
 
+/* ── Beep ── */
 function beep(freq = 880, duration = 0.4) {
     try {
         const ctx = new AudioContext();
@@ -342,7 +622,92 @@ function beep(freq = 880, duration = 0.4) {
     } catch(e) {}
 }
 
-/* ── Status update ── */
+/* ── Sidebar toggle (mobile) ── */
+function toggleSidebar() {
+    const sidebar = document.getElementById('kSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('visible');
+}
+
+/* ══════════════════════════════════════
+   FILTER LOGIC
+══════════════════════════════════════ */
+function countStatuses() {
+    const counts = { all: 0, pending: 0, preparing: 0, ready: 0, served: 0 };
+    document.querySelectorAll('.order-card[data-status]').forEach(card => {
+        const s = card.dataset.status;
+        counts.all++;
+        if (counts[s] !== undefined) counts[s]++;
+    });
+    return counts;
+}
+
+function updateCounts() {
+    const c = countStatuses();
+    ['all','pending','preparing','ready','served'].forEach(s => {
+        const fc = document.getElementById('fc-' + s);
+        const nb = document.getElementById('badge-' + s);
+        if (fc) fc.textContent = c[s];
+        if (nb) {
+            nb.textContent = c[s];
+            nb.classList.toggle('visible', c[s] > 0);
+        }
+    });
+}
+
+function applyFilter(status, clickedEl) {
+    currentFilter = status;
+
+    /* Sync sidebar nav items */
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const navEl = document.getElementById('nav-' + status);
+    if (navEl) navEl.classList.add('active');
+
+    /* Sync filter tabs */
+    document.querySelectorAll('.filter-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.filter === status);
+    });
+
+    /* Show/hide order cards */
+    document.querySelectorAll('.order-card').forEach(card => {
+        const show = status === 'all' || card.dataset.status === status;
+        card.classList.toggle('hidden-by-filter', !show);
+    });
+
+    /* Hide table sections that have no visible orders */
+    document.querySelectorAll('.table-section').forEach(section => {
+        const hasVisible = [...section.querySelectorAll('.order-card')]
+            .some(c => !c.classList.contains('hidden-by-filter'));
+        section.classList.toggle('hidden-by-filter', !hasVisible);
+    });
+
+    /* Show empty state if nothing left */
+    const emptyState = document.getElementById('emptyState');
+    const hasAnySections = [...document.querySelectorAll('.table-section')]
+        .some(s => !s.classList.contains('hidden-by-filter'));
+    if (emptyState) emptyState.style.display = 'none';
+
+    if (!hasAnySections) {
+        const container = document.getElementById('ordersContainer');
+        let placeholder = document.getElementById('filterEmptyState');
+        if (!placeholder) {
+            placeholder = document.createElement('div');
+            placeholder.id = 'filterEmptyState';
+            placeholder.className = 'empty-state';
+            container.appendChild(placeholder);
+        }
+        placeholder.innerHTML = `<strong>No ${status === 'all' ? 'active' : status} orders</strong>`;
+        placeholder.style.display = 'block';
+    } else {
+        const placeholder = document.getElementById('filterEmptyState');
+        if (placeholder) placeholder.style.display = 'none';
+    }
+}
+
+/* ══════════════════════════════════════
+   STATUS UPDATE (HTTP)
+══════════════════════════════════════ */
 function actionsHtml(orderId, status) {
     if (status === 'pending')   return `<button class="btn-action btn-prepare" onclick="updateStatus(${orderId},'preparing')">Start Preparing</button><button class="btn-action btn-cancel" onclick="updateStatus(${orderId},'cancelled')">Cancel</button>`;
     if (status === 'preparing') return `<button class="btn-action btn-ready" onclick="updateStatus(${orderId},'ready')">Mark Ready</button>`;
@@ -356,26 +721,35 @@ function updateStatus(orderId, status) {
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
         body: JSON.stringify({ order_id: orderId, status: status }),
     })
-    .then(r => r.json())
+    .then(r => {
+        if (r.status === 401) { location.href = '/ordering/kitchen/login/'; return null; }
+        return r.json();
+    })
     .then(d => {
-        if (d.status === 'ok') applyStatusChange(orderId, status);
+        if (d && d.status === 'ok') applyStatusChange(orderId, status);
     });
 }
 
 function applyStatusChange(orderId, status) {
-    const card    = document.getElementById(`order-${orderId}`);
+    const card = document.getElementById(`order-${orderId}`);
     if (!card) return;
     if (status === 'cancelled') {
         card.remove();
     } else {
+        card.dataset.status = status;
         const badge   = card.querySelector('.status-badge');
         const actions = document.getElementById(`actions-${orderId}`);
         if (badge)   { badge.className = `status-badge status-${status}`; badge.textContent = status; }
         if (actions) { actions.innerHTML = actionsHtml(orderId, status); }
     }
+    /* Re-apply current filter after status change */
+    applyFilter(currentFilter, null);
+    updateCounts();
 }
 
-/* ── New order from WebSocket ── */
+/* ══════════════════════════════════════
+   NEW ORDER CARD (WebSocket)
+══════════════════════════════════════ */
 function buildOrderCard(order) {
     const itemsHtml = order.items.map(i => `
         <div class="item-row">
@@ -386,7 +760,7 @@ function buildOrderCard(order) {
     `).join('');
 
     return `
-    <div class="order-card flash-new" id="order-${order.order_id}">
+    <div class="order-card flash-new" id="order-${order.order_id}" data-status="pending">
         <div class="order-meta">
             <span class="order-id">#${order.order_id}
                 <span class="status-badge status-pending">pending</span>
@@ -400,7 +774,9 @@ function buildOrderCard(order) {
     </div>`;
 }
 
-/* ── WebSocket ── */
+/* ══════════════════════════════════════
+   WEBSOCKET
+══════════════════════════════════════ */
 const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
 const wsUrl    = `${wsScheme}://${location.host}/ws/kitchen/${RESTAURANT_ID}/`;
 let ws, reconnectDelay = 1000, reconnectTimer = null;
@@ -413,10 +789,17 @@ function connectWS() {
         reconnectDelay = 1000;
         document.getElementById('ws-dot').classList.add('connected');
         document.getElementById('ws-label').textContent = 'Live';
+        document.getElementById('ws-label-text').textContent = 'Live';
     };
-    ws.onclose = () => {
+    ws.onclose = (e) => {
         document.getElementById('ws-dot').classList.remove('connected');
         document.getElementById('ws-label').textContent = 'Reconnecting…';
+        document.getElementById('ws-label-text').textContent = 'Reconnecting…';
+        /* 4001 = unauthenticated, 4003 = forbidden — redirect to login */
+        if (e.code === 4001 || e.code === 4003) {
+            location.href = '/ordering/kitchen/login/';
+            return;
+        }
         reconnectTimer = setTimeout(connectWS, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, 30000);
     };
@@ -428,14 +811,13 @@ function connectWS() {
             beep(880, 0.35);
             showToast(`New order #${data.order_id} — Table ${data.table}`, '#f39c12');
 
-            // Try to add the card into the correct guest column
             const guestCol = document.getElementById(`guest-${data.customer_session_id}`);
             if (guestCol) {
-                // Remove "no orders yet" placeholder if present
                 guestCol.querySelectorAll('.no-orders-msg').forEach(el => el.remove());
                 guestCol.insertAdjacentHTML('beforeend', buildOrderCard(data));
+                applyFilter(currentFilter, null);
+                updateCounts();
             } else {
-                // Guest column doesn't exist yet (new customer joined) — reload
                 setTimeout(() => location.reload(), 1000);
             }
         }
@@ -462,7 +844,8 @@ function connectWS() {
         if (data.type === 'table_closed') {
             const ts = document.getElementById(`ts-${data.session_id}`);
             if (ts) ts.remove();
-
+            updateCounts();
+            applyFilter(currentFilter, null);
             const main = document.querySelector('.main');
             if (main && !main.querySelector('.table-section')) {
                 main.innerHTML = `<div class="empty-state"><strong>Kitchen is quiet</strong>No active tables right now.</div>`;
@@ -471,6 +854,8 @@ function connectWS() {
     };
 }
 
+/* ── Init ── */
+updateCounts();
 connectWS();
 </script>
 

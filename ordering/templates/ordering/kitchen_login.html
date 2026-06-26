@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Kitchen Login</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:        #0d0d0d;
+            --surface:   #161616;
+            --surface2:  #1e1e1e;
+            --border:    #272727;
+            --accent:    #f39c12;
+            --accent-dk: #d68910;
+            --text:      #f0f0f0;
+            --muted:     #888;
+            --danger:    #e74c3c;
+            --danger-bg: #2b0a0a;
+            --radius:    14px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* ── Floating blobs for depth ── */
+        body::before, body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            pointer-events: none;
+            z-index: 0;
+        }
+        body::before {
+            width: 500px; height: 500px;
+            background: rgba(243,156,18,0.06);
+            top: -100px; left: -100px;
+        }
+        body::after {
+            width: 400px; height: 400px;
+            background: rgba(243,156,18,0.04);
+            bottom: -100px; right: -100px;
+        }
+
+        /* ── Card ── */
+        .card {
+            position: relative;
+            z-index: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 44px 40px 36px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+        }
+
+        /* ── Logo / header ── */
+        .card-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+        .logo-icon {
+            width: 64px; height: 64px;
+            background: linear-gradient(135deg, #f39c12, #d68910);
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 30px;
+            box-shadow: 0 8px 24px rgba(243,156,18,0.3);
+        }
+        .card-title {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.4px;
+        }
+        .card-subtitle {
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+        .badge-kitchen {
+            display: inline-block;
+            margin-top: 4px;
+            background: rgba(243,156,18,0.12);
+            color: var(--accent);
+            border: 1px solid rgba(243,156,18,0.25);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+
+        /* ── Error banner ── */
+        .error-banner {
+            background: var(--danger-bg);
+            border: 1px solid rgba(231,76,60,0.35);
+            color: var(--danger);
+            border-radius: 8px;
+            padding: 11px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* ── Form ── */
+        .form-group {
+            margin-bottom: 18px;
+        }
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 7px;
+        }
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            color: var(--text);
+            font-size: 15px;
+            padding: 13px 16px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(243,156,18,0.12);
+        }
+        input::placeholder { color: #444; }
+
+        /* ── Remember me ── */
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 22px;
+        }
+        .remember-row input[type="checkbox"] {
+            width: 16px; height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .remember-row label {
+            font-size: 13px;
+            text-transform: none;
+            letter-spacing: 0;
+            color: var(--muted);
+            cursor: pointer;
+            margin: 0;
+        }
+
+        /* ── Submit button ── */
+        .btn-login {
+            width: 100%;
+            background: linear-gradient(135deg, var(--accent), var(--accent-dk));
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 800;
+            padding: 14px;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            letter-spacing: 0.3px;
+        }
+        .btn-login:hover  { opacity: 0.9; }
+        .btn-login:active { transform: scale(0.98); }
+
+        /* ── Footer ── */
+        .card-footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 12px;
+            color: #444;
+        }
+
+        @media (max-width: 440px) {
+            .card { padding: 32px 22px 28px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="card-logo">
+        <div class="logo-icon">🍳</div>
+        <div>
+            <div class="card-title">Kitchen Dashboard</div>
+            <div class="card-subtitle">Staff access only</div>
+            <span class="badge-kitchen">Kitchen Portal</span>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="error-banner">
+        <span>⚠</span>
+        <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <form method="post" autocomplete="on">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input
+                type="text"
+                id="username"
+                name="username"
+                placeholder="Enter your username"
+                autofocus
+                autocomplete="username"
+                required
+            />
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                placeholder="Enter your password"
+                autocomplete="current-password"
+                required
+            />
+        </div>
+
+        <div class="remember-row">
+            <input type="checkbox" id="remember_me" name="remember_me"/>
+            <label for="remember_me">Remember me for 30 days</label>
+        </div>
+
+        <button type="submit" class="btn-login">Sign In to Kitchen</button>
+    </form>
+
+    <div class="card-footer">
+        Contact your restaurant owner to get access.
+    </div>
+</div>
+
+<script>
+    /* Submit button loading state */
+    document.querySelector('form').addEventListener('submit', function() {
+        const btn = this.querySelector('.btn-login');
+        btn.textContent = 'Signing in…';
+        btn.disabled = true;
+    });
+
+    /* Keyboard: Enter on username field moves to password */
+    document.getElementById('username').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('password').focus();
+        }
+    });
+</script>
+
+</body>
+</html>

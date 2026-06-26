@@ -5,6 +5,9 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 from .models import Order
 
+# Roles allowed to connect to the kitchen WebSocket
+_KITCHEN_WS_ROLES = ('owner', 'manager', 'kitchen')
+
 
 class KitchenConsumer(AsyncWebsocketConsumer):
     """
@@ -17,16 +20,41 @@ class KitchenConsumer(AsyncWebsocketConsumer):
       order_status_changed  — staff changed an order's status
       bill_requested        — customer tapped "Request Bill"
       table_closed          — staff closed the table
+
+    Security:
+      - Connection is rejected (code 4001) if the user is not authenticated.
+      - Connection is rejected (code 4003) if the user lacks the required role.
     """
 
     async def connect(self):
+        user = self.scope.get('user')
+
+        # Guard 1: unauthenticated
+        if not user or not user.is_authenticated:
+            await self.close(code=4001)
+            return
+
+        # Guard 2: check StaffProfile role
+        if not await self._has_kitchen_access(user):
+            await self.close(code=4003)
+            return
+
         self.restaurant_id = self.scope['url_route']['kwargs']['restaurant_id']
         self.group_name    = f"kitchen_{self.restaurant_id}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
 
+    @database_sync_to_async
+    def _has_kitchen_access(self, user):
+        try:
+            profile = user.staff_profile
+            return profile.is_active and profile.role in _KITCHEN_WS_ROLES
+        except Exception:
+            return False
+
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive(self, text_data):
         """Staff can update order status directly over the WS if they choose."""
@@ -66,6 +94,8 @@ class OrderConsumer(AsyncWebsocketConsumer):
     Used on the confirmation page to show live status updates.
 
     Group: order_{order_id}
+
+    No authentication required — customers identify via order ID in the URL.
     """
 
     async def connect(self):

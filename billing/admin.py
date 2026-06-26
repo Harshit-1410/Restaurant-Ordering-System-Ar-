@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Bill, Payment, StaffProfile
+from .models import Bill, Payment, StaffAuditLog, StaffProfile
 
 
 class PaymentInline(admin.TabularInline):
@@ -48,6 +48,20 @@ class PaymentAdmin(admin.ModelAdmin):
     list_display  = ['bill', 'payment_method', 'amount', 'received_by', 'paid_at']
     list_filter   = ['payment_method', 'paid_at']
     readonly_fields = ['bill', 'payment_method', 'amount', 'received_by', 'paid_at']
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(StaffAuditLog)
+class StaffAuditLogAdmin(admin.ModelAdmin):
+    list_display    = ['timestamp', 'action', 'staff_profile', 'username_attempted', 'ip_address']
+    list_filter     = ['action', 'timestamp']
+    readonly_fields = ['staff_profile', 'action', 'username_attempted', 'ip_address', 'user_agent', 'timestamp']
+    search_fields   = ['username_attempted', 'ip_address', 'staff_profile__user__username']
+
+    def has_add_permission(self, request):
+        return False
 
     def has_delete_permission(self, request, obj=None):
         return False
