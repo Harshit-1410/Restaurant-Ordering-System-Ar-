@@ -1,62 +1,182 @@
 # Testing Guide
 
-This document outlines the manual and automated testing cases and procedures for the AR Ordering System.
+Manual test procedures for all major flows in the AR Restaurant Ordering System.
 
 ---
 
-## 1. Automated Backend Test
-To run the automated endpoint validation checks for sessions, cart operations, order placements, and bill request blockages:
+## Setup
+
+Start the dev server:
 ```bash
-./.venv/bin/python3 /Users/harshitprajapati/.gemini/antigravity-ide/brain/15e96b20-0ee1-4ae5-999a-916924bdd840/scratch/qa_backend_test.py
+brew services start postgresql@16
+brew services start redis
+python3 manage.py runserver
 ```
 
+Ensure you have:
+- A `Restaurant` created in admin (e.g., slug `art-of-kitchen`, id `1`)
+- At least one `Category` and `MenuItem` with an image
+- At least one `Table` created in admin for that restaurant
+- A `StaffProfile` linked to your superuser for billing tests
+
 ---
 
-## 2. Manual Test Procedures
+## Module 1: Menu & AR
 
-### Test Case 1: Restaurant Loading & Menu Browsing
+### Test 1.1 — QR Token Session Join
 - **Steps**:
-  1. Open a web browser and navigate to `http://127.0.0.1:8000/art-of-kitchen/?table=1`.
-  2. Verify that the restaurant name "art of kitchen" renders in the header.
-  3. Verify that the category headers ("American", "Indian", etc.) are displayed.
-- **Expected Outcome**: Page loads without errors, showing the correct restaurant logo and available categories.
+  1. Go to Django Admin → Ordering → Tables. Click a table. Copy the "QR URL (full)" value.
+  2. Open that URL in a browser (e.g., `http://127.0.0.1:8000/art-of-kitchen/?t=<token>`).
+- **Expected**: Menu loads with a green banner: "Ordering at Table X". A `TableSession` and `CustomerSession` are created in the database.
 
-### Test Case 2: Category Switching & Search
-- **Steps**:
-  1. **Desktop**: Click on the categories in the sidebar. Verify the active layout shifts and displays items in that category.
-  2. **Mobile**: Collapse and expand category accordions. Verify that the chevron arrow rotates.
-  3. In the search bar, type "burger". Verify only the "Burger & Fries" card remains visible.
-  4. Clear the search input. Verify all dishes reappear.
-- **Expected Outcome**: Category switching changes active lists, and search filters items in real time.
+### Test 1.2 — Invalid QR Token
+- **Steps**: Visit `http://127.0.0.1:8000/art-of-kitchen/?t=fakeinvalidtoken`.
+- **Expected**: Menu loads with a red banner: "Invalid QR code". Cart and order buttons are disabled.
 
-### Test Case 3: Detail Modal & Cart Additions
-- **Steps**:
-  1. Click on the "Burger & Fries" product card.
-  2. Verify the product details modal opens, displaying veg/non-veg tags, description, and price.
-  3. Click the `+` button in the modal to increase quantity to `2`.
-  4. Click "Add to Cart".
-- **Expected Outcome**: Modal closes, a success toast "Added Burger & Fries to cart!" appears, the shopping cart badge count updates to `2`, and the desktop floating cart bar appears at the bottom.
+### Test 1.3 — Browse-Only Mode (no token)
+- **Steps**: Visit `http://127.0.0.1:8000/art-of-kitchen/` without a `?t=` parameter.
+- **Expected**: Menu loads with a blue banner: "Scan the QR code at your table to order". Cart buttons are disabled.
 
-### Test Case 4: Cart Management & Place Order
+### Test 1.4 — Category Navigation & Search
 - **Steps**:
-  1. Click "View Cart" in the floating cart bar (or the cart icon in the header) to navigate to `/ordering/cart/`.
-  2. Verify "Burger & Fries" is listed with quantity `2` and correct subtotal/total.
-  3. Click the `+` button to increase quantity to `3`. Verify total changes dynamically.
-  4. Click "Place Order".
-- **Expected Outcome**: The button immediately disables, displays "Placing order...", and redirects to the confirmation page displaying "Order #<id> Placed".
+  1. Click category names in the sidebar (desktop) or tap accordions (mobile).
+  2. Type in the search bar.
+- **Expected**: Items filter correctly. Accordions collapse/expand with chevron animation.
 
-### Test Case 5: Bill Request & Session Lock
+### Test 1.5 — AR Button
 - **Steps**:
-  1. Click the back arrow from the order confirmation page to return to `/art-of-kitchen/`.
-  2. Click the "Request Bill" button (sidebar on desktop, bottom-left FAB on mobile).
-  3. Verify the button background changes to green, displays "Bill Requested ✓", and becomes disabled.
-  4. Click on the "Burger & Fries" card to open the modal, and try to click "Add to Cart".
-- **Expected Outcome**: The request succeeds. Attempting to add items to the cart is blocked, showing a toast "Cannot add items after requesting the bill."
+  1. Open a menu item that has both `.glb` and `.usdz` files uploaded.
+  2. Click "View on Your Table".
+  3. On iOS Safari: AR Quick Look should launch.
+  4. On Android Chrome: `<model-viewer>` should overlay with AR option.
+- **Expected**: AR launches on the respective platform. Items without AR models should not show the button.
 
-### Test Case 6: Augmented Reality (AR) Button
+---
+
+## Module 2: Cart & Ordering
+
+### Test 2.1 — Add to Cart
 - **Steps**:
-  1. **With Model**: Ensure an item has AR models uploaded. Open the modal and verify the "View on Your Table" (AR) button is visible.
-  2. **Without Model**: Ensure an item has no AR models. Verify the button is hidden.
-  3. **iOS Safari**: Tap the button. Apple AR Quick Look should launch.
-  4. **Android Chrome**: Tap the button. Google Model Viewer should open, presenting the 3D model with an option to enter AR.
-- **Expected Outcome**: Button renders conditionally and launches the respective native platform viewer.
+  1. Scan a valid QR (or use `?t=<token>` URL). Click a menu item. Click "+ Add to Cart".
+- **Expected**: Toast "Added [item] to cart". Cart badge count increments. Floating cart bar appears.
+
+### Test 2.2 — Cart Management
+- **Steps**:
+  1. Navigate to `/ordering/cart/`.
+  2. Increase/decrease quantities. Remove an item.
+- **Expected**: Totals update dynamically. Removing the last item empties the cart.
+
+### Test 2.3 — Place Order
+- **Steps**:
+  1. Add items to cart. Click "Place Order".
+- **Expected**: Redirects to `/ordering/confirmation/<id>/`. Order appears in the kitchen dashboard.
+
+### Test 2.4 — Kitchen Real-Time Update
+- **Steps**:
+  1. Open the kitchen dashboard at `/ordering/kitchen/1/` in a second tab.
+  2. Place an order from the menu in the first tab.
+- **Expected**: New order card appears in the kitchen tab instantly (WebSocket), without page refresh.
+
+### Test 2.5 — Order Status Update
+- **Steps**:
+  1. On the customer confirmation page, note the order status ("Pending").
+  2. In the kitchen dashboard, change the order status to "Preparing".
+- **Expected**: Customer confirmation page updates status in real time via WebSocket.
+
+### Test 2.6 — Multi-Customer at Same Table
+- **Steps**:
+  1. Open the same QR URL in two different browsers (or incognito).
+  2. Add different items from each browser and place orders.
+- **Expected**: Kitchen dashboard shows both customers' orders under the same table section, in separate guest columns.
+
+---
+
+## Module 3: Bill Request
+
+### Test 3.1 — Request Bill
+- **Steps**:
+  1. After placing an order, click "Request Bill" (sidebar on desktop, FAB on mobile).
+- **Expected**: Button turns green, shows "Bill Requested ✓", becomes disabled. Kitchen dashboard shows a bill request notification.
+
+### Test 3.2 — Session Lock After Bill Request
+- **Steps**:
+  1. After requesting the bill, try to add another item to the cart.
+- **Expected**: Returns error toast "Cannot add items after requesting the bill." (400 response).
+
+---
+
+## Module 4: Billing Dashboard
+
+### Test 4.1 — Login & Role Check
+- **Steps**:
+  1. Go to `/billing/login/`.
+  2. Log in with a user that has a `StaffProfile`.
+  3. Log in with a regular user (no `StaffProfile`).
+- **Expected**: Staff user is redirected to `/billing/`. Regular user sees error "You are not registered as billing staff."
+
+### Test 4.2 — Open Tables Page
+- **Steps**:
+  1. Go to `/billing/open/`.
+- **Expected**: Cards show all tables with active `TableSession`s. Color coded: green (< 30 min), orange (30–60 min), red (> 60 min). Tables with bill requests show orange "Bill Requested" badge.
+
+### Test 4.3 — Auto-Generate Bill
+- **Steps**:
+  1. Click "View Bill" on a table card.
+- **Expected**: Bill is created automatically. Bill number (e.g., `BILL-20260626-0001`) appears. Subtotal matches the sum of all non-cancelled orders for the table.
+
+### Test 4.4 — Apply Discount
+- **Steps**:
+  1. On the bill detail page, expand "Discount". Select "% Percentage". Enter `10`. Enter reason "Regular customer". Click "Apply Discount".
+- **Expected**: Toast confirms discount applied. Summary panel updates: discount row appears, grand total decreases. Tax is calculated on the post-discount amount.
+
+### Test 4.5 — Record Payment
+- **Steps**:
+  1. Select "Cash" as payment method. Enter an amount. Click "Add Payment".
+- **Expected**: Payment tag appears in the "Payments Recorded" section. "Amount Due" decreases.
+
+### Test 4.6 — Split Payment
+- **Steps**:
+  1. Add a Cash payment for part of the total. Add a UPI payment for the remainder.
+- **Expected**: Both payments listed. "Amount Due" shows ₹0.00.
+
+### Test 4.7 — Close Bill
+- **Steps**:
+  1. With amount due at ₹0, click "Mark as Paid & Close Table". Confirm in modal.
+- **Expected**: Toast "Bill marked as PAID ✓". Redirects to open bills page. Table no longer appears in open bills. `TableSession.status` is now `paid` in the database.
+
+### Test 4.8 — Bill Immutability
+- **Steps**:
+  1. Visit the bill detail page of a paid bill.
+- **Expected**: Green banner "Bill paid on [date]". Discount, payment, and close sections are hidden. No mutation is possible.
+
+### Test 4.9 — Printable Receipt
+- **Steps**:
+  1. Click "🖨️ Print Receipt" on a paid bill.
+- **Expected**: Receipt page opens in a new tab with thermal-style white layout. Browser print dialog works. Sidebar and navigation are hidden in print mode.
+
+### Test 4.10 — Bill History Filters
+- **Steps**:
+  1. Go to `/billing/history/`. Filter by "Today". Filter by payment method "Cash". Search by bill number.
+- **Expected**: Table shows only matching bills. Filters combine correctly.
+
+### Test 4.11 — Reports (Owner/Manager Only)
+- **Steps**:
+  1. Log in as an owner. Go to `/billing/reports/`.
+  2. Log in as a cashier. Try to access `/billing/reports/`.
+- **Expected**: Owner sees Chart.js charts and top items table. Cashier receives 403 Forbidden.
+
+---
+
+## Module 5: WebSocket Connection
+
+### Test 5.1 — Live Connection Indicator
+- **Steps**:
+  1. Open the billing dashboard.
+  2. Disconnect the internet briefly.
+- **Expected**: The green live dot in the top bar turns red and label shows "Reconnecting…". Reconnects automatically when internet restores.
+
+### Test 5.2 — Bill Request Toast
+- **Steps**:
+  1. Open the billing dashboard.
+  2. From a customer browser, click "Request Bill".
+- **Expected**: Yellow toast appears on the billing dashboard: "🧾 Bill Requested — Table X".

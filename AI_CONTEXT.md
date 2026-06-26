@@ -1,14 +1,14 @@
 # AI Context Document
 
-This document provides a comprehensive context and documentation of the Augmented Reality (AR) Restaurant Ordering system, optimized for subsequent AI assistants to understand the codebase and build on it immediately.
+This document provides comprehensive context for AI assistants to understand and build on this codebase immediately.
+
+**Live deployment**: `https://web-production-cac8d9.up.railway.app`
 
 ---
 
 ## 1. Project Overview
-The project is a Web-based Augmented Reality (AR) Restaurant Ordering application. It allows customers sitting at a table to scan a QR code, browse a digital menu with rich food photography, view 3D AR representations of select dishes directly on their table, add items to a cart, place orders, and request the bill, all via their mobile web browsers.
-The kitchen staff can view incoming orders and update their preparation status in real-time, and the manager can handle billing at the counter via dedicated dashboards.
 
-**Live deployment**: `https://web-production-cac8d9.up.railway.app`
+A Web-based Augmented Reality (AR) Restaurant Ordering System. Customers scan a table-specific QR code, browse a digital menu with AR previews, add items to a personal cart, place orders, and request a bill — all from their mobile browser. Kitchen staff see incoming orders in real time. Managers and cashiers handle billing through a dedicated, role-protected Billing Dashboard.
 
 ---
 
@@ -19,180 +19,244 @@ The kitchen staff can view incoming orders and update their preparation status i
 | Backend Framework | Django 4.2.30 |
 | Real-Time Layer | Django Channels 4.3.2 + WebSockets |
 | ASGI Server | Daphne 4.2.2 |
-| Channel Layer | Redis (channels_redis 4.3.0) |
-| Database | PostgreSQL 16 (local dev + Railway production) |
+| Channel Layer | Redis (`channels_redis` 4.3.0) |
+| Database | PostgreSQL 16 |
 | DB Adapter | psycopg2-binary 2.9.12 |
-| Environment Config | python-decouple 3.8 (reads from `.env`) |
+| Environment Config | python-decouple 3.8 |
 | Static Files | WhiteNoise 6.11.0 |
 | DB URL Parsing | dj-database-url 3.0.1 |
 | Image Handling | Pillow 11.2.1 |
 | Frontend | HTML5, CSS3, Vanilla JavaScript (no framework) |
 | AR Engine | Google `<model-viewer>` (Android/WebXR) + Apple AR Quick Look (`.usdz` on iOS) |
-| Icons & Fonts | FontAwesome 6.5.0, Google Fonts |
 
 ---
 
 ## 3. Directory Structure
+
 ```
 ar-main/
-├── core/                        # Core Django project config
+├── core/                        # Django project config
 │   ├── settings/
-│   │   ├── __init__.py
-│   │   ├── base.py              # Shared settings (all environments)
-│   │   ├── dev.py               # Development: DEBUG=True, local PostgreSQL
-│   │   └── prod.py              # Production: Railway DATABASE_URL + REDIS_URL
-│   ├── asgi.py                  # ASGI entry point (Channels ProtocolTypeRouter)
-│   ├── wsgi.py                  # WSGI entry point
-│   └── urls.py
+│   │   ├── base.py              # Shared settings
+│   │   ├── dev.py               # DEBUG=True, local PostgreSQL
+│   │   └── prod.py              # Railway: DATABASE_URL, REDIS_URL, HTTPS
+│   ├── asgi.py                  # ASGI entry (Channels ProtocolTypeRouter)
+│   └── urls.py                  # Root URL conf (ordering/, billing/, then restaurants catch-all)
 ├── restaurants/                 # Restaurant, Category, MenuItem models
-│   ├── templates/restaurants/
-│   │   └── menu.html            # Unified responsive menu template
+│   ├── templates/restaurants/menu.html
 │   └── views.py
-├── ordering/                    # Cart, TableSession, Order, WebSocket logic
-│   ├── templates/ordering/
-│   │   ├── cart.html
-│   │   ├── kitchen.html         # Real-time kitchen dashboard
-│   │   ├── billing.html         # Counter billing dashboard
-│   │   └── session_bill.html    # Printed receipt layout
+├── ordering/                    # Cart, Table, TableSession, CustomerSession, Order
+│   ├── models.py                # All ordering models (see §5)
+│   ├── session.py               # Stateless QR-token → CustomerSession helpers
 │   ├── consumers.py             # KitchenConsumer, OrderConsumer (WebSocket)
 │   ├── routing.py               # WebSocket URL routes
-│   └── views.py
-├── media/                       # Uploaded images and AR models (.glb, .usdz)
-├── staticfiles/                 # Collected static files (generated, git-ignored)
+│   ├── views.py                 # All ordering HTTP views
+│   ├── admin.py                 # TableAdmin (with QR URL), TableSessionAdmin, etc.
+│   └── templates/ordering/
+│       ├── kitchen.html         # Real-time kitchen dashboard (grouped by table/guest)
+│       ├── billing.html         # Simple unauthenticated billing view (legacy)
+│       ├── cart.html
+│       └── session_bill.html
+├── billing/                     # Authenticated Billing Dashboard (separate app)
+│   ├── models.py                # StaffProfile, Bill, Payment
+│   ├── services.py              # Business logic: generate_bill, apply_discount, etc.
+│   ├── views.py                 # All billing HTTP views
+│   ├── decorators.py            # @billing_required, @role_required
+│   ├── urls.py
+│   ├── admin.py
+│   ├── migrations/
+│   └── templates/billing/
+│       ├── base.html            # Dark sidebar layout + WebSocket
+│       ├── login.html
+│       ├── dashboard.html       # KPI cards + bill requests
+│       ├── open_bills.html      # Active table session cards
+│       ├── bill_detail.html     # Items, discount, payment, close
+│       ├── history.html         # Filterable bill history table
+│       ├── receipt.html         # Printable thermal-style receipt
+│       └── reports.html         # Chart.js analytics
+├── media/                       # Uploaded images + AR models (committed to git)
 ├── .env                         # Local secrets (git-ignored)
-├── .env.example                 # Template for .env
-├── .gitignore
+├── .env.example
 ├── requirements.txt
 ├── manage.py
-├── Procfile                     # Railway process definition
-├── railway.toml                 # Railway build + deploy config
-└── build.sh                     # Railway build script (install + collectstatic)
+├── railway.toml
+└── build.sh
 ```
 
 ---
 
 ## 4. Settings Architecture
 
-The settings are split into three files under `core/settings/`:
+- **`base.py`**: INSTALLED_APPS (`restaurants`, `ordering`, `billing`), WhiteNoise, Redis channel layer, static/media paths, session engine.
+- **`dev.py`**: `DEBUG=True`, `ALLOWED_HOSTS=['*']`, PostgreSQL from individual `DB_*` env vars.
+- **`prod.py`**: `DEBUG=False`, `ALLOWED_HOSTS` from CSV env var, PostgreSQL from `DATABASE_URL`, Redis from `REDIS_URL`, `SECURE_SSL_REDIRECT=False` (Railway proxy handles SSL).
 
-- **`base.py`**: All shared config — INSTALLED_APPS, MIDDLEWARE (with WhiteNoise), TEMPLATES, CHANNEL_LAYERS (Redis), static files (WhiteNoise + STATIC_ROOT), media, i18n, session engine.
-- **`dev.py`**: `DEBUG=True`, `ALLOWED_HOSTS=['*']`, PostgreSQL from individual `.env` vars (`DB_NAME`, `DB_USER`, etc.).
-- **`prod.py`**: `DEBUG=False`, `ALLOWED_HOSTS` from `ALLOWED_HOSTS` env var (CSV), PostgreSQL from `DATABASE_URL` (Railway plugin), Redis from `REDIS_URL` (Railway plugin), HSTS + security headers, `SECURE_SSL_REDIRECT=False` (Railway terminates SSL at proxy).
-
-**Default settings module**: `core.settings.dev` (set in `manage.py`, `asgi.py`, `wsgi.py`).  
-**Production**: set `DJANGO_SETTINGS_MODULE=core.settings.prod` as an env var.
+Default: `core.settings.dev`. Production: set `DJANGO_SETTINGS_MODULE=core.settings.prod`.
 
 ---
 
 ## 5. Database Models & Schema
-```
-              ┌─────────────────┐
-              │   Restaurant    │
-              └────────┬────────┘
-                       │ 1
-                       │ *
-              ┌────────┴────────┐
-              │    Category     │
-              └────────┬────────┘
-                       │ 1
-                       │ *
-              ┌────────┴────────┐
-              │   MenuItem      │◄──────────────────┐
-              └─────────────────┘                   │
-                                                    │
-              ┌─────────────────┐                   │
-              │  TableSession   │                   │
-              └────────┬────────┘                   │
-                       │ 1                          │
-                       ├─────────────────────┐      │
-                       │ 1                   │ 1    │ *
-              ┌────────┴────────┐   ┌────────┴───┐  │
-              │     Order       │   │    Cart    │  │
-              └────────┬────────┘   └────────┬───┘  │
-                       │ 1                   │ 1    │
-                       │ *                   │ *    │
-              ┌────────┴────────┐   ┌────────┴───┐  │
-              │   OrderItem     ├───┼─── CartItem ──┘
-              └─────────────────┘   └────────────┘
-```
 
-### Key Models
-1. **Restaurant**: Fields `name`, `slug`, `image`, `is_active`, `created_at`.
-2. **Category**: Fields `restaurant` (FK), `name`, `image`, `is_active`.
-3. **MenuItem**: Fields `category` (FK), `name`, `description`, `price`, `image`, `is_available`, `ar_model_file` (`.glb`), `ar_model_usdz` (`.usdz`), `is_veg`.
-4. **TableSession**: Fields `restaurant` (FK), `table_number`, `session_token`, `is_active`, `bill_requested_at`, `is_paid`, `closed_at`.
-5. **Cart**: Belongs to a `TableSession`.
-6. **CartItem**: Fields `cart` (FK), `menu_item` (FK), `quantity`, `notes`.
-7. **Order**: Fields `table_session` (FK), `restaurant` (FK), `status` (`pending`, `preparing`, `ready`, `served`, `cancelled`), `total_amount`, `created_at`.
-8. **OrderItem**: Fields `order` (FK), `menu_item` (FK), `quantity`, `unit_price`, `subtotal`.
-
----
-
-## 6. End-to-End Application Flows
-
-### 1. Cart Flow
-1. Customer visits `/<restaurant-slug>/?table=<table_number>`.
-2. Django view sets up a `TableSession` in the session store.
-3. Customer clicks "Add to Cart". Frontend makes a `POST` to `/ordering/cart/add/`.
-4. Backend updates the `CartItem` record associated with the active session.
-5. Badges and the floating desktop Cart Bar update immediately.
-
-### 2. Ordering Flow
-1. Customer clicks "View Cart" → `/ordering/cart/`.
-2. Quantity buttons send increment/decrement calls to the backend.
-3. Customer clicks "Place Order" → `POST /ordering/place/`.
-4. Backend converts `CartItem`s into `Order` + `OrderItem` records, clears cart, notifies kitchen via WebSockets.
-5. Customer is redirected to `/ordering/confirmation/<order_id>/`.
-
-### 3. AR Flow
-1. If a `MenuItem` has `.glb` / `.usdz` models uploaded, "View on your table" appears.
-2. **iOS Safari**: Launches Apple AR Quick Look via `<a rel="ar">` targeting `.usdz`.
-3. **Android Chrome**: Overlays Google `<model-viewer>` and launches Android Scene Viewer.
-4. **Unsupported browsers**: Shows interactive 3D model inline.
-
-### 4. Bill Request Flow
-1. Customer clicks "Request Bill".
-2. `POST /ordering/bill/request/` → records `bill_requested_at`, notifies dashboards via WebSockets.
-3. UI locks the button (green "Bill Requested ✓").
-4. Further cart additions return `400 Bad Request`.
-
----
-
-## 7. Key API Endpoints
-- `GET /<restaurant-slug>/?table=<n>` : Customer-facing menu page.
-- `GET /item/<item_id>/detail/` : Returns item details + AR model URLs as JSON.
-- `POST /ordering/cart/add/` : Adds an item to the cart.
-- `GET /ordering/cart/data/` : Returns cart item count and subtotal.
-- `POST /ordering/cart/remove/<cart_item_id>/` : Removes or decrements a cart item.
-- `POST /ordering/place/` : Places the order.
-- `POST /ordering/bill/request/` : Requests the bill.
-- `GET /ordering/kitchen/<restaurant_id>/` : Kitchen real-time dashboard.
-- `GET /ordering/billing/` : Counter billing dashboard.
-
----
-
-## 8. Real-Time WebSockets
-- **`/ws/kitchen/<restaurant_id>/`**: Broadcasts `new_order` and `bill_requested` events to the kitchen dashboard.
-- **`/ws/order/<order_id>/`**: Broadcasts order status updates to the customer confirmation page.
-
-Both channels use Redis as the backing channel layer (`channels_redis.core.RedisChannelLayer`).
-
----
-
-## 9. Deployment
-- **Platform**: Railway (`https://railway.app`)
-- **Build**: `bash build.sh` → `pip install` + `collectstatic`
-- **Start**: `python manage.py migrate && daphne -b 0.0.0.0 -p $PORT core.asgi:application`
-- **Database**: Railway PostgreSQL plugin (injects `DATABASE_URL`)
-- **Redis**: Railway Redis plugin (injects `REDIS_URL`)
-- **Static files**: Served by WhiteNoise middleware from `staticfiles/`
-- **Media files**: Ephemeral (wiped on redeploy) — cloud storage integration pending
-
-### Required Railway Environment Variables
-| Variable | Source |
+### restaurants app
+| Model | Key Fields |
 |---|---|
-| `DJANGO_SETTINGS_MODULE` | Set manually: `core.settings.prod` |
-| `SECRET_KEY` | Set manually (generate with `get_random_secret_key()`) |
-| `ALLOWED_HOSTS` | Set manually: your `.up.railway.app` domain |
-| `DATABASE_URL` | Reference: `${{Postgres.DATABASE_URL}}` |
-| `REDIS_URL` | Reference: `${{Redis.REDIS_URL}}` |
+| `Restaurant` | `name`, `slug`, `logo`, `is_active`, `address`, `phone`, `gst_number` |
+| `Category` | `restaurant` FK, `name`, `image`, `is_active` |
+| `MenuItem` | `category` FK, `name`, `description`, `price`, `image`, `ar_model_file` (.glb), `ar_model_usdz` (.usdz), `is_veg`, `is_available` |
+
+### ordering app
+| Model | Key Fields |
+|---|---|
+| `Table` | `restaurant` FK, `table_number`, `qr_token` (unique, `secrets.token_urlsafe(24)`), `is_active` |
+| `TableSession` | `table` FK, `status` (open/paid/closed), `started_at`, `ended_at`, `bill_requested_at` |
+| `CustomerSession` | `table_session` FK, `browser_uuid`, `created_at`, `last_seen` |
+| `Cart` | `customer_session` OneToOne |
+| `CartItem` | `cart` FK, `menu_item` FK, `quantity`, `notes` |
+| `Order` | `customer_session` FK, `status` (pending/preparing/ready/served/cancelled), `total_amount` |
+| `OrderItem` | `order` FK, `menu_item` FK, `quantity`, `unit_price`, `notes` |
+
+### billing app
+| Model | Key Fields |
+|---|---|
+| `StaffProfile` | `user` OneToOne, `restaurant` FK, `role` (owner/manager/cashier), `is_active` |
+| `Bill` | `table_session` OneToOne, `restaurant` FK, `cashier` FK, `subtotal`, `tax_percentage`, `tax_amount`, `discount_type/value/amount/reason`, `round_off`, `grand_total`, `status` (draft/paid/void), `paid_at` |
+| `Payment` | `bill` FK, `payment_method` (cash/upi/credit_card/debit_card), `amount`, `transaction_ref`, `received_by` FK |
+
+**Schema relationships:**
+```
+Restaurant ──< Table ──< TableSession ──< CustomerSession ──< Order ──< OrderItem
+                                  │                    └──── Cart ──< CartItem
+                                  └── Bill (OneToOne) ──< Payment
+                                  (StaffProfile ──> Restaurant + User)
+```
+
+---
+
+## 6. Security Model
+
+- **QR tokens**: Generated with `secrets.token_urlsafe(24)`. Never expose `table_id` in URLs.
+- **Session binding**: `CustomerSession.id` stored in the Django server-side session cookie (`request.session['customer_session_id']`). Never trusted from URL parameters.
+- **Billing auth**: `StaffProfile` role check via `@billing_required` and `@role_required` decorators. Kitchen dashboard is unauthenticated (internal use).
+- **Bill immutability**: `services._guard_paid()` raises `ValueError` on any mutation attempt after `status == 'paid'`. Admin `has_delete_permission` returns `False` for `Bill` and `Payment`.
+
+---
+
+## 7. URL Routing
+
+**Important**: `ordering/` and `billing/` prefixes must appear BEFORE `path('', include('restaurants.urls'))` in `core/urls.py`, because `restaurants/urls.py` contains `path('<slug:restaurant_slug>/', ...)` which would otherwise match any URL as a restaurant slug.
+
+```
+/admin/                                  → Django admin
+/ordering/...                            → ordering app (cart, orders, kitchen, billing-legacy)
+/billing/                                → Billing Dashboard login redirect
+/billing/login/                          → Billing Dashboard login
+/billing/open/                           → Active table sessions
+/billing/bills/<session_id>/             → Bill detail (auto-generates Bill on first open)
+/billing/bills/<id>/discount/            → POST: apply discount
+/billing/bills/<id>/payment/             → POST: add payment
+/billing/bills/<id>/close/               → POST: mark paid + close TableSession
+/billing/bills/<id>/receipt/             → Printable receipt
+/billing/history/                        → Filterable bill history
+/billing/reports/                        → Analytics (Chart.js) — owner/manager only
+/<restaurant-slug>/                      → Customer menu (restaurants app catch-all)
+/<restaurant-slug>/?t=<qr_token>         → Menu with QR session join
+/ws/kitchen/<restaurant_id>/             → WebSocket: kitchen + billing events
+/ws/order/<order_id>/                    → WebSocket: order status updates
+```
+
+---
+
+## 8. Key Application Flows
+
+### QR Scan → Order Flow
+1. Customer scans QR → `/<slug>/?t=<qr_token>`.
+2. `ordering/session.py:join_table()` validates token → finds/creates `TableSession` → finds/creates `CustomerSession` → stores `CustomerSession.id` in Django session cookie.
+3. Customer adds items → `POST /ordering/cart/add/` → `_get_or_create_cart(customer_session)`.
+4. Customer places order → `POST /ordering/place/` → creates `Order` + `OrderItem` records → broadcasts `new_order` via WebSocket to `kitchen_{restaurant_id}` group.
+5. Customer requests bill → `POST /ordering/bill/request/` → sets `bill_requested_at` → broadcasts `bill_requested`.
+
+### Billing Flow (Authenticated)
+1. Cashier logs in at `/billing/login/` (requires `StaffProfile`).
+2. Dashboard shows KPIs + bill requests (live WebSocket updates).
+3. Cashier opens `/billing/open/` → clicks table card → `/billing/bills/<session_id>/`.
+4. `Bill` is auto-generated on first open (idempotent, `services.generate_bill()`).
+5. Cashier applies optional discount → adds payment method(s) → clicks "Mark as Paid".
+6. `services.close_bill()` → marks `Bill.status = 'paid'` → calls `TableSession.close(paid=True)` → broadcasts `table_closed` WebSocket event.
+7. Future QR scans create a fresh `TableSession`.
+
+---
+
+## 9. session.py Reference
+
+`ordering/session.py` — imported by both `ordering/views.py` and `restaurants/views.py`:
+
+| Function | Purpose |
+|---|---|
+| `get_or_create_browser_uuid(request)` | Returns a stable random UUID stored in Django session |
+| `join_table(request, qr_token)` | Validates token → creates/reuses `TableSession` + `CustomerSession` |
+| `get_active_customer_session(request)` | Looks up the `CustomerSession` from Django session; returns None if closed |
+
+---
+
+## 10. services.py Reference (billing)
+
+`billing/services.py` — all business logic; views are thin wrappers:
+
+| Function | Purpose |
+|---|---|
+| `calculate_totals(bill)` | Computes subtotal, discount, tax, round-off, grand_total. Does NOT save. |
+| `generate_bill(table_session, cashier)` | Creates Draft Bill (idempotent) |
+| `recalculate_bill(bill)` | Refreshes all totals and saves |
+| `apply_discount(bill, type, value, reason, user)` | Applies/replaces discount with audit trail |
+| `remove_discount(bill)` | Clears discount fields |
+| `add_payment(bill, method, amount, ref, user)` | Records a Payment row |
+| `delete_payment(payment)` | Removes a Payment (draft bills only) |
+| `close_bill(bill)` | Marks PAID, closes TableSession, broadcasts WebSocket |
+| `today_stats(restaurant)` | KPI dict for dashboard |
+| `revenue_last_n_days(restaurant, n)` | List of `{date, revenue}` for charts |
+| `payment_method_breakdown(restaurant, days)` | `{labels, values}` for doughnut chart |
+| `top_items(restaurant, limit, days)` | Top items by quantity sold |
+
+---
+
+## 11. WebSocket Events
+
+All events broadcast to `kitchen_{restaurant_id}` group:
+
+| Event `type` | Payload | Consumers |
+|---|---|---|
+| `new_order` | `order_id`, `table`, `customer_session_id`, `items` | Kitchen, Billing dashboard |
+| `order_update` | `order_id`, `status` | Customer confirmation page |
+| `bill_requested` | `session_id`, `table` | Kitchen, Billing dashboard |
+| `table_closed` | `session_id`, `table` | Kitchen, Billing open bills |
+
+---
+
+## 12. Deployment (Railway)
+
+| Phase | Command |
+|---|---|
+| Build | `bash build.sh` → pip install + collectstatic |
+| Start | `python manage.py migrate && daphne -b 0.0.0.0 -p $PORT core.asgi:application` |
+
+**Required env vars**: `DJANGO_SETTINGS_MODULE=core.settings.prod`, `SECRET_KEY`, `ALLOWED_HOSTS`, `DATABASE_URL`, `REDIS_URL`.
+
+**Media files**: AR models (`.glb`, `.usdz`) and food images are committed directly to the git repo under `media/` and served via Django's `serve()` view. No external cloud storage needed.
+
+---
+
+## 13. Creating Billing Staff (Production)
+
+After deploying, create a `StaffProfile` for the superuser via Django shell or admin:
+
+```python
+from django.contrib.auth.models import User
+from restaurants.models import Restaurant
+from billing.models import StaffProfile
+
+user = User.objects.get(username='admin')
+restaurant = Restaurant.objects.first()
+StaffProfile.objects.create(user=user, restaurant=restaurant, role='owner')
+```
+
+Then log in at `/billing/login/`.

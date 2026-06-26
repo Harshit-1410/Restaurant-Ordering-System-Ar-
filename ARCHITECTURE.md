@@ -1,31 +1,20 @@
 # Architecture Documentation
 
-This document describes the component hierarchy, data flow, settings architecture, and lifecycle operations of the AR Ordering System.
-
 ---
 
-## 1. Component Hierarchy
+## 1. Application Architecture Overview
 
 ```
-[menu.html]
-  ├── Desktop Layout (Culinary Clarity)
-  │     ├── Header (.d-header) -> Cart Badge (.d-cart-badge)
-  │     ├── Sidebar (.d-sidebar) -> Category Nav & Request Bill Button (.d-bill-btn)
-  │     ├── Main Grid (.d-grid) -> Item Cards (.d-card)
-  │     └── Floating Cart Bar (.d-cart-bar)
-  │
-  ├── Mobile Layout (Savor Mobile)
-  │     ├── Header (.m-header) -> Search Box (.m-search)
-  │     ├── Body Content -> Collapsible Accordions (.m-cat) -> List Items (.m-item)
-  │     ├── Floating Menu FAB (.m-fab)
-  │     ├── Floating Bill FAB (.m-bill-btn)
-  │     └── Bottom Navigation Bar (.m-bottom-nav)
-  │
-  └── Shared Dialog Modal (.modal-backdrop)
-        ├── Item Details & Veg/Non-Veg Tag
-        ├── AR Preview Overlay (Google <model-viewer> or Quick Look Link)
-        └── Quantity Controls (.qty-ctrl) & Add to Cart button (.btn-add-cart)
+ar-main/
+  ├── restaurants/   Menu & item data (read-mostly)
+  ├── ordering/      Session, cart, orders, kitchen, WebSocket
+  └── billing/       Authenticated billing dashboard, bills, payments, analytics
 ```
+
+The three Django apps are fully separate with clear dependency direction:
+- `restaurants` has no dependencies on other apps
+- `ordering` depends on `restaurants` (MenuItem FKs)
+- `billing` depends on `ordering` (TableSession FK) and `restaurants` (Restaurant FK)
 
 ---
 
@@ -33,28 +22,66 @@ This document describes the component hierarchy, data flow, settings architectur
 
 ```
 core/settings/
-  ├── base.py       ← Shared: apps, middleware (WhiteNoise), channels (Redis),
-  │                            static (STATIC_ROOT, /static/), media, i18n
-  ├── dev.py        ← Extends base: DEBUG=True, ALLOWED_HOSTS=*, PostgreSQL
-  │                            from individual DB_* env vars
-  └── prod.py       ← Extends base: DEBUG=False, ALLOWED_HOSTS CSV,
-                               PostgreSQL from DATABASE_URL (dj-database-url),
-                               Redis from REDIS_URL, HSTS headers,
-                               SECURE_SSL_REDIRECT=False (Railway proxy handles SSL)
+  ├── base.py   ← Shared: INSTALLED_APPS (restaurants, ordering, billing),
+  │                       WhiteNoise middleware, Redis channel layer,
+  │                       static (STATIC_ROOT, /static/), media, sessions
+  ├── dev.py    ← DEBUG=True, ALLOWED_HOSTS=*, PostgreSQL from DB_* vars
+  └── prod.py   ← DEBUG=False, ALLOWED_HOSTS from CSV env var,
+                   PostgreSQL from DATABASE_URL, Redis from REDIS_URL,
+                   SECURE_SSL_REDIRECT=False (Railway proxy handles SSL)
 ```
-
-Entry points (`manage.py`, `asgi.py`, `wsgi.py`) default to `core.settings.dev`.
-Set `DJANGO_SETTINGS_MODULE=core.settings.prod` in Railway to use production settings.
 
 ---
 
-## 3. Deployment Architecture
+## 3. URL Routing Architecture
+
+**Critical ordering rule**: specific prefixes must come before the restaurants slug catch-all.
+
+```
+core/urls.py
+  ├── path('admin/', ...)
+  ├── path('ordering/', include('ordering.urls'))   ← BEFORE restaurants
+  ├── path('billing/',  include('billing.urls'))    ← BEFORE restaurants
+  ├── path('',          home)
+  └── path('',          include('restaurants.urls'))
+         └── path('<slug:restaurant_slug>/', ...)   ← catch-all, must be last
+```
+
+If `billing/` or `ordering/` appeared after the restaurants include, the slug pattern `<slug:...>` would match them first and return 404.
+
+---
+
+## 4. Data Model Relationships
+
+```
+Restaurant
+  │
+  ├──< Category ──< MenuItem
+  │
+  ├──< Table  (qr_token = unique secret)
+  │     │
+  │     └──< TableSession  (status: open/paid/closed)
+  │               │
+  │               ├──< CustomerSession  (1 per browser/device)
+  │               │         │
+  │               │         ├── Cart (1:1) ──< CartItem ──> MenuItem
+  │               │         └──< Order ──< OrderItem ──> MenuItem
+  │               │
+  │               └── Bill (1:1, OneToOneField)
+  │                     └──< Payment
+  │
+  └──< StaffProfile ──> User  (role: owner/manager/cashier)
+```
+
+---
+
+## 5. Deployment Architecture
 
 ```
 [GitHub main branch]
-        │  push
+        │  git push
         ▼
-[Railway CI — Nixpacks build]
+[Railway CI — Nixpacks]
         │  bash build.sh
         ├── pip install -r requirements.txt
         └── python manage.py collectstatic --no-input
@@ -63,82 +90,174 @@ Set `DJANGO_SETTINGS_MODULE=core.settings.prod` in Railway to use production set
         [Docker image built]
                 │  container start
                 ▼
-        python manage.py migrate
+        python manage.py migrate --no-input
                 │
                 ▼
         daphne -b 0.0.0.0 -p $PORT core.asgi:application
                 │
-        ┌───────┴────────────────────┐
-        │                            │
-   HTTP traffic                WS traffic
-        │                            │
-   WhiteNoise                 AuthMiddlewareStack
-   (static files)             → URLRouter
-        │                            │
-   Django views            KitchenConsumer / OrderConsumer
-        │                            │
-   PostgreSQL              Redis channel layer
-   (DATABASE_URL)          (REDIS_URL)
+        ┌───────┴───────────────────────┐
+        │                               │
+   HTTP requests                  WS connections
+        │                               │
+  WhiteNoise (static)           AuthMiddlewareStack
+  Django views                  → URLRouter
+        │                               │
+  PostgreSQL (DATABASE_URL)     KitchenConsumer / OrderConsumer
+                                        │
+                                  Redis (REDIS_URL)
 ```
 
 ---
 
-## 4. Dynamic Data Flows
-
-### Cart Lifecycle & Addition
+## 6. Customer QR Session Flow
 
 ```
-[Frontend Click] ────► [POST /ordering/cart/add/]
-                             │
-                             ▼
-                    [get_or_create_cart]
-                             │
-                             ├─► Active Session?
-                             │     ├── Yes: Retrieve existing TableSession
-                             │     └── No: Create new TableSession
-                             │
-                             ▼
-                    [CartItem get_or_create]
-                             │
-                             ▼
-                    [Calculate new totals] ──► [Response HTTP 200 JSON]
-                                                     │
-                                                     ▼
-                                            [updateCartState()]
-                                                     │
-                                                     ▼
-                                            Update Badge Counts
-                                            Show/Update Floating Cart Bar
+Customer scans QR (/<slug>/?t=<qr_token>)
+        │
+        ▼
+restaurants/views.py:menu()
+        │
+        ├── ordering/session.py:join_table(request, qr_token)
+        │         │
+        │         ├── Validate token → Table (raises 'invalid_token' if not found)
+        │         ├── Find or create open TableSession for Table
+        │         ├── Generate or retrieve browser_uuid from Django session
+        │         └── Find or create CustomerSession(table_session, browser_uuid)
+        │                   │
+        │                   └── Store CustomerSession.id in request.session
+        │
+        └── Render menu.html with: has_session=True, table_number, bill_requested
 ```
 
 ---
 
-## 5. Real-Time WebSocket Flows
+## 7. Ordering Flow
 
 ```
-[Client places order] ──► [POST /ordering/place/]
-                                │
-                                ▼
-                       [Create Order & items]
-                                │
-                                ▼
-                    [django-channels group_send]
-                          (via Redis layer)
-                                │
-                                ▼
-             [KitchenConsumer ws connection group]
-                                │
-                                ▼
-               [Broadcast new_order to Kitchen]
+Customer adds item
+        │  POST /ordering/cart/add/
+        ▼
+ordering/views.py:cart_add()
+        │
+        ├── get_active_customer_session(request)  ← from session cookie only
+        ├── _get_or_create_cart(customer_session)
+        └── CartItem.objects.get_or_create(cart, menu_item)
+
+Customer places order
+        │  POST /ordering/place/
+        ▼
+ordering/views.py:place_order()
+        │
+        ├── Convert CartItems → Order + OrderItems
+        ├── Clear cart
+        └── channel_layer.group_send('kitchen_{id}', {type:'new_order', ...})
+                │
+                ▼
+        KitchenConsumer.new_order()
+                │
+                └── Broadcast to all kitchen WebSocket connections
 ```
 
 ---
 
-## 6. Session & Request Locking Lifecycle
-1. **Dining State**: Active TableSession exists. Customer can add, modify, or remove items from the cart, and place multiple orders.
-2. **Bill Requested State**: Customer triggers the bill request.
-   - Sets `bill_requested_at` timestamp.
-   - Pushes WebSocket notice to Kitchen and Billing dashboards.
-   - Locks TableSession: Frontend buttons are disabled (turning green).
-   - Backend view checks `cart.session.bill_requested_at` on every addition request. If set, returns `400 Bad Request`.
-3. **Paid State**: Cashier clicks "Close Session" on `/ordering/billing/`, which marks `is_active=False` and `is_paid=True`. The table QR code is ready for the next customer group.
+## 8. Billing Flow
+
+```
+Cashier opens /billing/
+        │
+        ├── @billing_required → check User has active StaffProfile
+        ├── billing/views.py:dashboard() → today_stats(), bill_requests
+        └── Render KPI cards + pending bill requests
+
+Cashier clicks "View Bill" for a table
+        │
+        └── /billing/bills/<session_id>/
+                │
+                ├── billing/services.generate_bill(table_session, cashier)
+                │     ← Idempotent: returns existing Bill if already exists
+                │     ← Computes subtotal from all non-cancelled orders
+                │
+                ├── Cashier optionally applies discount
+                │     POST /billing/bills/<id>/discount/
+                │     └── services.apply_discount() → recalculate all totals
+                │
+                ├── Cashier records payment(s)
+                │     POST /billing/bills/<id>/payment/
+                │     └── services.add_payment() → Payment row created
+                │
+                └── Cashier closes bill (when amount_due ≤ ₹0.50)
+                      POST /billing/bills/<id>/close/
+                      └── services.close_bill()
+                            ├── Bill.status = 'paid', paid_at = now()
+                            ├── TableSession.close(paid=True)
+                            │     ├── TableSession.status = 'paid'
+                            │     └── TableSession.ended_at = now()
+                            └── group_send('kitchen_{id}', {type:'table_closed'})
+```
+
+---
+
+## 9. WebSocket Architecture
+
+```
+Browser (Kitchen / Billing / Customer)
+        │  ws://.../ws/kitchen/<restaurant_id>/
+        ▼
+Django Channels URLRouter
+        │
+        ▼
+KitchenConsumer (ordering/consumers.py)
+        │
+        ├── connect()   → join group 'kitchen_{restaurant_id}'
+        ├── disconnect()→ leave group
+        └── Handlers:
+              new_order(data)    → forward to WebSocket client
+              order_update(data) → forward to WebSocket client
+              bill_requested(data) → forward to WebSocket client
+              table_closed(data)   → forward to WebSocket client
+
+Browser (Customer order confirmation)
+        │  ws://.../ws/order/<order_id>/
+        ▼
+OrderConsumer
+        │
+        ├── connect()  → join group 'order_{order_id}'
+        └── order_update(data) → forward to customer browser
+```
+
+---
+
+## 10. Session & Request Locking Lifecycle
+
+```
+1. BROWSING      → No CustomerSession. Menu visible, cart/order buttons disabled.
+                   (Banner shown: "Scan QR to order")
+
+2. ACTIVE        → CustomerSession exists, TableSession.status = 'open'.
+                   Full cart and ordering access.
+
+3. BILL REQUESTED→ bill_requested_at set on TableSession.
+                   Cart additions blocked (400 response).
+                   Bill Request button locked green.
+
+4. BILL OPEN     → Bill generated (status=draft), cashier handling payment.
+                   TableSession still 'open', customers cannot order.
+
+5. PAID          → Bill.status = 'paid', TableSession.status = 'paid'.
+                   CustomerSessions invalidated (get_active_customer_session returns None).
+                   New QR scan creates a fresh TableSession.
+```
+
+---
+
+## 11. Media File Strategy
+
+AR models (`.glb`, `.usdz`) and food images are **committed directly to the git repository** under `media/`. They are served by Django's `serve()` view registered in `core/urls.py`:
+
+```python
+re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT})
+```
+
+**Why**: Railway's filesystem is ephemeral (wiped on redeploy). Git-committed media is always present after every deploy without requiring any external cloud storage service, free tier limits, or payment methods.
+
+**Trade-off**: Large binary files in git history. Acceptable for a small restaurant with a fixed menu of AR models.
