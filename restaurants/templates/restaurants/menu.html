@@ -732,7 +732,7 @@
      ═══════════════════════════════════════ -->
 <div class="mobile-view">
     <header class="m-header">
-        <a class="m-back" href="/" aria-label="Go to home page"><i class="fas fa-arrow-left"></i></a>
+        <a class="m-back" href="/" onclick="goToWelcome(event);" aria-label="Go to welcome screen"><i class="fas fa-arrow-left"></i></a>
         <div class="m-search">
             <i class="fas fa-search"></i>
             <input type="text" placeholder='Search menu...' id="m-search-input" oninput="filterItems(this.value)">
@@ -1265,6 +1265,22 @@ document.addEventListener('keydown', e => {
         });
     }
 })();
+
+/* ══════════════════════════════════════════
+   BACK ARROW — re-show welcome screen
+   If a QR token is present, clear the "already seen" flag and reload
+   so the welcome overlay appears again. Falls back to / if no token.
+   ══════════════════════════════════════════ */
+function goToWelcome(e) {
+    var hasToken = new URLSearchParams(location.search).has('t');
+    if (hasToken) {
+        e.preventDefault();
+        var slug = '{{ restaurant.slug|escapejs }}';
+        sessionStorage.removeItem('welcomed_' + slug);
+        location.reload();
+    }
+    // no token → let the href="/" navigate normally
+}
 </script>
 </body>
 </html>
