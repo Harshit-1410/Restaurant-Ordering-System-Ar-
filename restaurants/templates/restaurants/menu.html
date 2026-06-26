@@ -331,10 +331,235 @@
             font-weight: 700;
             color: #111827;
         }
+
+        /* ═══════════════════════════════════════
+           WELCOME OVERLAY
+           Premium full-screen onboarding screen
+           shown once per QR scan session.
+           ═══════════════════════════════════════ */
+        .w-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: #fff;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 28px 36px;
+            text-align: center;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+        .w-overlay.w-open { display: flex; }
+        .w-overlay.w-dismiss {
+            animation: w-slideup 0.55s cubic-bezier(0.4,0,0.2,1) forwards;
+        }
+        @keyframes w-slideup {
+            from { transform: translateY(0); opacity: 1; }
+            to   { transform: translateY(-100%); opacity: 0; }
+        }
+
+        /* ── Decorative floating elements ── */
+        .w-deco { position: absolute; pointer-events: none; border-radius: 50%; }
+        .w-ring-lg {
+            width: 110px; height: 110px;
+            border: 1.5px solid rgba(201,124,93,0.14);
+            top: 52px; left: -28px;
+            animation: w-float 9s ease-in-out infinite;
+        }
+        .w-ring-sm {
+            width: 52px; height: 52px;
+            border: 1.5px solid rgba(201,124,93,0.12);
+            top: 150px; right: 22px;
+            animation: w-float 6.5s ease-in-out 1.2s infinite;
+        }
+        .w-ring-xl {
+            width: 160px; height: 160px;
+            border: 1px solid rgba(201,124,93,0.07);
+            bottom: 80px; right: -52px;
+            animation: w-float 11s ease-in-out 2.5s infinite;
+        }
+        .w-ring-xs {
+            width: 28px; height: 28px;
+            border: 1px solid rgba(201,124,93,0.18);
+            bottom: 180px; left: 30px;
+            animation: w-float 7s ease-in-out 0.5s infinite;
+        }
+        .w-dot { border-radius: 50%; position: absolute; }
+        .w-dot-a { width: 8px; height: 8px; background: rgba(201,124,93,0.22); top: 95px; right: 58px; }
+        .w-dot-b { width: 5px; height: 5px; background: rgba(201,124,93,0.16); top: 195px; left: 34px; }
+        .w-dot-c { width: 6px; height: 6px; background: rgba(201,124,93,0.13); bottom: 145px; left: 52px; }
+        .w-dot-d { width: 4px; height: 4px; background: rgba(201,124,93,0.20); bottom: 240px; right: 40px; }
+        .w-dot-grid {
+            position: absolute; top: 44px; right: 26px;
+            width: 54px; height: 54px;
+            background-image: radial-gradient(circle, rgba(201,124,93,0.24) 1.3px, transparent 1.3px);
+            background-size: 10px 10px;
+        }
+        .w-leaf-bg {
+            position: absolute; top: 20px; left: -10px;
+            opacity: 0.07; transform: rotate(-15deg);
+            pointer-events: none;
+        }
+        @keyframes w-float {
+            0%, 100% { transform: translateY(0); }
+            50%       { transform: translateY(-14px); }
+        }
+
+        /* ── Logo circle ── */
+        .w-logo-ring {
+            width: 230px; height: 230px; border-radius: 50%;
+            background: linear-gradient(145deg, #ffffff 0%, #fafaf9 100%);
+            border: 1px solid rgba(201,124,93,0.16);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 28px; flex-shrink: 0;
+            animation: w-logo-in 0.75s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;
+        }
+        .w-logo-img {
+            width: 68%; height: 68%;
+            object-fit: contain; border-radius: 50%;
+        }
+        .w-logo-initials {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 70px; font-weight: 800;
+            color: #C97C5D; line-height: 1; user-select: none;
+        }
+        .w-logo-icon { font-size: 80px; line-height: 1; }
+        @keyframes w-logo-in {
+            from { transform: scale(0.55); opacity: 0; }
+            to   { transform: scale(1);    opacity: 1; }
+        }
+
+        /* ── Text content ── */
+        .w-name {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 32px; font-weight: 800; color: #111827;
+            letter-spacing: -0.5px; margin-bottom: 6px; line-height: 1.1;
+            animation: w-fade-up 0.5s ease 0.45s both;
+        }
+        .w-tagline {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 15px; font-weight: 500;
+            color: #C97C5D; letter-spacing: 0.3px;
+            animation: w-fade-up 0.5s ease 0.58s both;
+        }
+        .w-divider {
+            width: 28px; height: 2px; background: #C97C5D;
+            border-radius: 2px; margin: 10px auto 14px;
+            animation: w-fade-up 0.5s ease 0.62s both;
+        }
+        .w-desc {
+            font-size: 14px; color: #9ca3af; line-height: 1.75;
+            max-width: 276px; margin-bottom: 36px;
+            animation: w-fade-up 0.5s ease 0.72s both;
+        }
+        @keyframes w-fade-up {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── CTA button ── */
+        .w-cta {
+            width: 100%; max-width: 300px; height: 60px;
+            background: #C97C5D; color: #fff; border: none; border-radius: 999px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 16px; font-weight: 700; letter-spacing: 0.2px;
+            cursor: pointer; position: relative; overflow: hidden;
+            transition: background 0.2s, transform 0.12s;
+            animation: w-fade-up 0.5s ease 0.88s both;
+        }
+        .w-cta:hover  { background: #b8694c; transform: translateY(-1px); }
+        .w-cta:active { transform: scale(0.97); }
+        .w-ripple {
+            position: absolute; border-radius: 50%;
+            background: rgba(255,255,255,0.38);
+            transform: scale(0);
+            animation: w-ripple-anim 0.55s linear;
+            pointer-events: none;
+        }
+        @keyframes w-ripple-anim { to { transform: scale(4.5); opacity: 0; } }
+
+        /* ── Responsive adjustments for small phones ── */
+        @media (max-height: 700px) {
+            .w-logo-ring { width: 180px; height: 180px; margin-bottom: 20px; }
+            .w-logo-initials { font-size: 58px; }
+            .w-name { font-size: 28px; }
+            .w-desc { font-size: 13px; margin-bottom: 24px; }
+            .w-cta { height: 54px; }
+        }
     </style>
 </head>
 <body>
 <div style="display: none;">{% csrf_token %}</div>
+
+{% if has_session %}
+<!-- ════════════════════════════════════════════════
+     WELCOME OVERLAY — shown once per QR scan session
+     ════════════════════════════════════════════════ -->
+<div class="w-overlay" id="welcome-overlay" role="dialog" aria-modal="true" aria-label="Welcome to {{ restaurant.name }}">
+
+    <!-- Background decorative shapes -->
+    <div class="w-dot-grid"></div>
+    <div class="w-deco w-ring-lg"></div>
+    <div class="w-deco w-ring-sm"></div>
+    <div class="w-deco w-ring-xl"></div>
+    <div class="w-deco w-ring-xs"></div>
+    <div class="w-dot w-dot-a"></div>
+    <div class="w-dot w-dot-b"></div>
+    <div class="w-dot w-dot-c"></div>
+    <div class="w-dot w-dot-d"></div>
+
+    <!-- Botanical leaf watermark (top-left) -->
+    <div class="w-leaf-bg">
+        <svg width="90" height="130" viewBox="0 0 90 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M45 124 C45 124 6 90 6 54 C6 22 24 6 45 6 C66 6 84 22 84 54 C84 90 45 124 45 124Z"
+                  fill="#C97C5D"/>
+            <line x1="45" y1="6" x2="45" y2="124" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M22 40 C33 46 45 40 45 40" stroke="white" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <path d="M30 58 C38 64 45 58 45 58" stroke="white" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <path d="M35 75 C41 79 45 75 45 75" stroke="white" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <path d="M68 40 C57 46 45 40 45 40" stroke="white" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <path d="M60 58 C52 64 45 58 45 58" stroke="white" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        </svg>
+    </div>
+
+    <!-- Logo circle -->
+    <div class="w-logo-ring">
+        {% if restaurant.logo %}
+        <img src="{{ restaurant.logo.url }}" alt="{{ restaurant.name }} logo" class="w-logo-img"/>
+        {% else %}
+        <div class="w-logo-initials">{{ restaurant.name|first|upper }}</div>
+        {% endif %}
+    </div>
+
+    <!-- Restaurant name -->
+    <h1 class="w-name">{{ restaurant.name }}</h1>
+
+    <!-- Tagline -->
+    <p class="w-tagline">
+        {% if restaurant.description %}
+            {{ restaurant.description|truncatewords:5 }}
+        {% else %}
+            Good Food. Great Taste.
+        {% endif %}
+    </p>
+    <div class="w-divider"></div>
+
+    <!-- Description -->
+    <p class="w-desc">
+        {% if restaurant.description %}
+            {{ restaurant.description|truncatewords:20 }}
+        {% else %}
+            Explore our handcrafted menu filled with delicious dishes, refreshing drinks, and chef specials made just for you.
+        {% endif %}
+    </p>
+
+    <!-- CTA button -->
+    <button class="w-cta" id="w-cta-btn" aria-label="Open menu">
+        Explore Menu &nbsp;&rarr;
+    </button>
+</div>
+{% endif %}
 
 {% if qr_error %}
 <!-- QR error banner -->
@@ -935,6 +1160,51 @@ document.addEventListener('keydown', e => {
         closeOrdersModal();
     }
 });
+</script>
+
+<script>
+/* ════════════════════════════════════════
+   WELCOME OVERLAY — show once per session
+   ════════════════════════════════════════ */
+(function () {
+    var overlay = document.getElementById('welcome-overlay');
+    if (!overlay) return;                          // not rendered (no QR session)
+
+    var slug = '{{ restaurant.slug|escapejs }}';
+    var KEY  = 'welcomed_' + slug;
+
+    /* Show only when the URL contains ?t= (fresh QR scan) AND not already welcomed */
+    var hasToken = new URLSearchParams(location.search).has('t');
+    if (hasToken && !sessionStorage.getItem(KEY)) {
+        overlay.classList.add('w-open');
+        document.body.style.overflow = 'hidden';   // prevent scroll-behind
+    }
+
+    function dismiss() {
+        sessionStorage.setItem(KEY, '1');
+        overlay.classList.add('w-dismiss');
+        document.body.style.overflow = '';
+        setTimeout(function () { overlay.remove(); }, 580);
+    }
+
+    /* CTA button — ripple then dismiss */
+    var cta = document.getElementById('w-cta-btn');
+    if (cta) {
+        cta.addEventListener('click', function (e) {
+            var ripple = document.createElement('span');
+            ripple.className = 'w-ripple';
+            var rect = cta.getBoundingClientRect();
+            var size = Math.max(rect.width, rect.height);
+            ripple.style.cssText =
+                'width:' + size + 'px;height:' + size + 'px;' +
+                'left:' + (e.clientX - rect.left - size / 2) + 'px;' +
+                'top:'  + (e.clientY - rect.top  - size / 2) + 'px;';
+            cta.appendChild(ripple);
+            setTimeout(function () { ripple.remove(); }, 560);
+            setTimeout(dismiss, 90);
+        });
+    }
+})();
 </script>
 </body>
 </html>
